@@ -1,0 +1,1473 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>雇用契約管理 | THE HERBS</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="contract-render.js"></script>
+<style>
+:root{
+  --bg:#f6f5f1; --panel:#fff; --ink:#22281f; --sub:#667060; --line:#dcded6; --line2:#eceee8;
+  --accent:#3f6b45; --accent-ink:#fff; --accent-soft:#e7efe6;
+  --red:#b3261e; --red-soft:#fbe9e7; --amber:#8a5a00; --amber-soft:#fff3d6; --blue:#1d5a8a; --blue-soft:#e6f0f8;
+  --gray-soft:#f0f0ec;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",Meiryo,sans-serif;font-size:14px;line-height:1.55}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--accent)}
+header.top{display:flex;align-items:center;gap:16px;padding:12px 20px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+header.top h1{font-size:16px;margin:0;font-weight:700;letter-spacing:.04em;white-space:nowrap}
+.scroll > table.t{min-width:820px}
+@media (max-width:700px){header.top{flex-wrap:wrap;gap:8px;padding:10px 16px} #todayLabel,.who{display:none} nav.tabs{top:0;position:relative;padding:0 8px} main{padding:16px} .modal{padding:14px}}
+header.top .sp{flex:1}
+header.top .who{color:var(--sub);font-size:12px}
+nav.tabs{display:flex;gap:2px;padding:0 20px;background:var(--panel);border-bottom:1px solid var(--line);overflow-x:auto;position:sticky;top:49px;z-index:19}
+nav.tabs button{border:0;background:none;padding:10px 14px;cursor:pointer;color:var(--sub);border-bottom:2px solid transparent;white-space:nowrap}
+nav.tabs button.on{color:var(--ink);border-bottom-color:var(--accent);font-weight:700}
+main{padding:20px;max-width:1400px;margin:0 auto}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;margin-bottom:16px}
+.card h2{font-size:15px;margin:0 0 12px}
+.card h3{font-size:14px;margin:16px 0 8px}
+.muted{color:var(--sub)}
+.small{font-size:12px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+.grid{display:grid;gap:12px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:800px){.g2,.g3,.g4{grid-template-columns:1fr}}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--sub)}
+label.f > span{font-weight:600}
+input[type=text],input[type=number],input[type=date],input[type=email],input[type=password],select,textarea{border:1px solid var(--line);border-radius:6px;padding:7px 9px;background:#fff;color:var(--ink);min-width:0;width:100%}
+textarea{min-height:64px;resize:vertical}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+.btn{border:1px solid var(--line);background:#fff;border-radius:6px;padding:7px 12px;cursor:pointer;white-space:nowrap}
+.btn:hover{background:var(--gray-soft)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.pri:hover{filter:brightness(1.08)}
+.btn.danger{color:var(--red);border-color:#e6b7b2}
+.btn.sm{padding:3px 8px;font-size:12px}
+.btn:disabled{opacity:.5;cursor:default}
+table.t{width:100%;border-collapse:collapse;font-size:13px}
+table.t th,table.t td{border-bottom:1px solid var(--line2);padding:7px 8px;text-align:left;vertical-align:top}
+table.t th{background:#fafaf7;color:var(--sub);font-weight:600;font-size:12px;position:sticky;top:0}
+table.t tr.click{cursor:pointer}
+table.t tr.click:hover td{background:#fafcf8}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.scroll{overflow:auto}
+.pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:600;white-space:nowrap;border:1px solid transparent}
+.p-red{background:var(--red-soft);color:var(--red)}
+.p-amber{background:var(--amber-soft);color:var(--amber)}
+.p-green{background:var(--accent-soft);color:var(--accent)}
+.p-blue{background:var(--blue-soft);color:var(--blue)}
+.p-gray{background:var(--gray-soft);color:var(--sub)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.kpi .v{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
+.kpi .l{font-size:12px;color:var(--sub)}
+.kpi.red .v{color:var(--red)} .kpi.amber .v{color:var(--amber)}
+.alert{display:flex;gap:10px;align-items:flex-start;padding:9px 10px;border-radius:6px;margin-bottom:6px;border:1px solid var(--line2)}
+.alert .who{font-weight:700;min-width:110px}
+.alert .msg{flex:1}
+.alert.red{background:var(--red-soft);border-color:#f0c9c4}
+.alert.amber{background:var(--amber-soft);border-color:#f0dfae}
+.alert.blue{background:var(--blue-soft);border-color:#c9dcec}
+.hidden{display:none !important}
+#login{max-width:380px;margin:80px auto}
+.modal-bg{position:fixed;inset:0;background:rgba(20,24,18,.45);z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:24px 12px;overflow:auto}
+.modal{background:#fff;border-radius:10px;max-width:1000px;width:100%;padding:20px;box-shadow:0 10px 40px rgba(0,0,0,.2)}
+.modal h2{margin:0 0 12px;font-size:16px}
+.foot{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--line2)}
+.checks{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--ink)}
+.checks label{display:flex;gap:4px;align-items:center}
+.warn{color:var(--red);font-size:12px}
+.note{background:#fafaf7;border:1px dashed var(--line);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--sub)}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#22281f;color:#fff;padding:10px 16px;border-radius:6px;z-index:100;font-size:13px}
+.score{display:flex;gap:4px}
+.score button{width:34px;padding:5px 0;border:1px solid var(--line);background:#fff;border-radius:5px;cursor:pointer}
+.score button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+@media (max-width:900px){.split{grid-template-columns:1fr}}
+dl.kv{display:grid;grid-template-columns:120px 1fr;gap:4px 10px;margin:0;font-size:13px}
+dl.kv dt{color:var(--sub)}
+dl.kv dd{margin:0}
+
+/* ===== 印刷 ===== */
+#printArea{display:none}
+@media print{
+  @page{size:A4;margin:10mm 12mm}
+  body{background:#fff}
+  body > *:not(#printArea){display:none !important}
+  #printArea{display:block !important}
+  .doc-page{page-break-after:always}
+  .doc-page:last-child{page-break-after:auto}
+}
+/* 基準書 */
+.policy{font-family:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;color:#000;font-size:10pt;line-height:1.6}
+.policy h1{font-size:16pt;text-align:center;margin:0 0 6mm}
+.policy h2{font-size:12pt;border-bottom:1px solid #000;margin:6mm 0 2mm;padding-bottom:1mm}
+.policy table{border-collapse:collapse;width:100%;margin:2mm 0}
+.policy th,.policy td{border:1px solid #000;padding:1mm 2mm;text-align:left;font-weight:400}
+.policy th{background:#f2f2f2}
+</style>
+</head>
+<body>
+
+<div id="login" class="card hidden">
+  <h2>雇用契約管理 ログイン</h2>
+  <p class="muted small">勤怠システムの管理者アカウントでログインしてください。</p>
+  <div class="grid">
+    <label class="f"><span>メールアドレス</span><input type="email" id="lgEmail" autocomplete="username"></label>
+    <label class="f"><span>パスワード</span><input type="password" id="lgPass" autocomplete="current-password"></label>
+    <button class="btn pri" id="lgBtn">ログイン</button>
+    <div id="lgMsg" class="warn"></div>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+  <header class="top">
+    <h1>雇用契約管理</h1>
+    <span class="muted small" id="todayLabel"></span>
+    <span class="sp"></span>
+    <span class="who" id="whoLabel"></span>
+    <button class="btn sm" id="btnExport">台帳をExcel出力</button>
+    <button class="btn sm" id="btnPass">パスワード変更</button>
+    <button class="btn sm" id="btnLogout">ログアウト</button>
+  </header>
+  <nav class="tabs" id="tabs">
+    <button data-tab="dash" class="on">ダッシュボード</button>
+    <button data-tab="staff">従業員・契約一覧</button>
+    <button data-tab="review">昇給検討</button>
+    <button data-tab="sign">署名状況</button>
+    <button data-tab="bonus">賞与</button>
+    <button data-tab="settings">基準・設定</button>
+  </nav>
+  <main>
+    <section id="tab-dash"></section>
+    <section id="tab-staff" class="hidden"></section>
+    <section id="tab-review" class="hidden"></section>
+    <section id="tab-sign" class="hidden"></section>
+    <section id="tab-bonus" class="hidden"></section>
+    <section id="tab-settings" class="hidden"></section>
+  </main>
+</div>
+
+<div id="modalRoot"></div>
+<div id="printArea"></div>
+
+<script>
+'use strict';
+// ===== 接続設定（勤怠システムと同じ Supabase プロジェクト） =====
+const SUPABASE_URL = 'https://bngafucbmdnehzqmsles.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_Zd5lDU_gxbWzBAqnwo-_2g_wmisbRyk';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// 契約書の文面・描画は contract-render.js（署名ページと共通）
+const CR = window.ContractRender; CR.injectStyles();
+const PUBLIC_BASE = 'https://ymiyagawatheherbs-tech.github.io/theherbs-contracts/';
+
+const EMP_TYPES = ['正社員','契約社員','パートタイム','アルバイト'];
+const CHANGE_TYPES = ['新規','条件変更なし更新','賃金改定あり更新','条件変更あり更新','雇用形態変更','契約終了'];
+const STATUSES = ['下書き','締結済','要確認','終了'];
+const WAGE_TYPES = ['時給','日給','日給月給','月給'];
+
+// ===== 状態 =====
+const S = { employees:[], ws:{}, locations:{}, contracts:[], reviews:[], bonuses:[], requests:[], settings:{}, stats:null, statsRange:null, me:null, tab:'dash' };
+
+// ===== ユーティリティ =====
+const $ = (s, el=document) => el.querySelector(s);
+const $$ = (s, el=document) => [...el.querySelectorAll(s)];
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const yen = n => (n == null || n === '' || isNaN(n)) ? '' : Number(n).toLocaleString('ja-JP');
+const pad = n => String(n).padStart(2,'0');
+function todayStr(){ const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function parseD(s){ if(!s) return null; const [y,m,d]=s.split('-').map(Number); return new Date(y,m-1,d); }
+function fmtD(s){ if(!s) return ''; const d=parseD(s); return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())}`; }
+function toStr(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function addDays(s,n){ const d=parseD(s); d.setDate(d.getDate()+n); return toStr(d); }
+function addMonths(s,n){ const d=parseD(s); const day=d.getDate(); d.setDate(1); d.setMonth(d.getMonth()+n); const last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate(); d.setDate(Math.min(day,last)); return toStr(d); }
+function daysBetween(a,b){ return Math.round((parseD(b)-parseD(a))/86400000); }
+function yearsBetween(a,b){ return daysBetween(a,b)/365.25; }
+function tenureLabel(from, to){ if(!from) return ''; const a=parseD(from), b=parseD(to||todayStr()); let m=(b.getFullYear()-a.getFullYear())*12+(b.getMonth()-a.getMonth()); if(b.getDate()<a.getDate()) m--; if(m<0) return ''; return `${Math.floor(m/12)}年${m%12}か月`; }
+function wareki(s){ if(!s) return {y:'',m:'',d:''}; const d=parseD(s); return {y:d.getFullYear()-2018, m:d.getMonth()+1, d:d.getDate()}; }
+function warekiText(s){ if(!s) return '令和　　年　　月　　日'; const w=wareki(s); return `令和 ${w.y}年 ${w.m}月 ${w.d}日`; }
+function toast(msg){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2600); }
+function empName(id){ const e=S.employees.find(x=>x.id===id); return e? e.name : '(不明)'; }
+function ck(on){ return on ? '☑' : '☐'; }
+function setting(key, fallback){ return (S.settings[key] && S.settings[key].value) ?? fallback; }
+function minWage(){ return Number(setting('min_wage',{}).amount || 0); }
+
+// 時給換算（最低賃金チェック用）
+function hourlyEquivalent(c){
+  if(!c) return null;
+  const w=Number(c.base_wage||0);
+  if(c.wage_type==='時給') return w;
+  if(c.wage_type==='日給') return c.hours_per_day ? w/Number(c.hours_per_day) : null;
+  // 月給・日給月給：月平均所定労働時間＝週所定×52÷12
+  const wh = Number(c.weekly_hours || (c.days_per_week && c.hours_per_day ? c.days_per_week*c.hours_per_day : 0));
+  return wh ? w/(wh*52/12) : null;
+}
+
+// ===== 契約の解釈 =====
+function contractsOf(empId){ return S.contracts.filter(c=>c.employee_id===empId).sort((a,b)=> (b.start_date||'').localeCompare(a.start_date||'') || b.seq-a.seq); }
+function currentContract(empId){
+  const list=contractsOf(empId).filter(c=>c.status!=='下書き');
+  const t=todayStr();
+  return list.find(c=>c.start_date<=t && (!c.end_date || c.end_date>=t)) || list[0] || null;
+}
+function draftOf(empId){ return contractsOf(empId).find(c=>c.status==='下書き') || null; }
+function firstStart(emp){
+  const list=contractsOf(emp.id).filter(c=>c.status!=='下書き');
+  const fromC = list.length ? list[list.length-1].start_date : null;
+  return [emp.hire_date, fromC].filter(Boolean).sort()[0] || null;
+}
+function lastReview(empId){ return S.reviews.filter(r=>r.employee_id===empId).sort((a,b)=>b.review_date.localeCompare(a.review_date))[0] || null; }
+function activeStaff(){ return S.employees.filter(e=>e.active && e.role!=='admin'); }
+
+// アラート判定
+function alertsFor(emp){
+  const out=[]; const t=todayStr();
+  const rules=setting('review_rules',{}); const alertDays=Number(rules.alert_days||60); const mkYears=Number(rules.mukitenkan_years||5);
+  const c=currentContract(emp.id); const dr=draftOf(emp.id);
+  if(!c){ out.push({lv:'red',code:'none',msg:'契約が登録されていません'}); return out; }
+  if(c.is_fixed_term && c.end_date){
+    const left=daysBetween(t,c.end_date);
+    if(left<0) out.push({lv:'red',code:'expired',msg:`契約期間が終了しています（${fmtD(c.end_date)}終了・${-left}日経過）。更新契約の締結が必要です`+(dr?'（下書きあり）':'')});
+    else if(left<=alertDays) out.push({lv:'amber',code:'soon',msg:`契約終了まで${left}日（${fmtD(c.end_date)}）。面談・更新準備を開始してください`+(dr?'（下書きあり）':'')});
+  }
+  if(c.status==='要確認') out.push({lv:'amber',code:'check',msg:'台帳から移行した契約で内容の確認が必要です'+(c.note?`：${c.note}`:'')});
+  const fs=firstStart(emp);
+  if(c.is_fixed_term && fs){
+    const reach=addMonths(fs, mkYears*12);
+    if(reach<=t) out.push({lv:'red',code:'muki',msg:`有期契約の通算が${mkYears}年を超えています（初回契約 ${fmtD(fs)}）。無期転換申込権の告知・対応方針の決定が必要です`});
+    else if(c.end_date && reach<=c.end_date) out.push({lv:'amber',code:'muki',msg:`現契約期間中に通算${mkYears}年に達します（${fmtD(reach)}）。次回更新時に無期転換申込権が発生します`});
+  }
+  const mw=minWage(); const he=hourlyEquivalent(c);
+  if(mw && he!=null && he<mw) out.push({lv:'red',code:'minwage',msg:`時給換算 ${Math.floor(he).toLocaleString()}円が最低賃金 ${mw.toLocaleString()}円を下回っています`});
+  if(c.status==='締結済' && !c.file_path) out.push({lv:'blue',code:'nofile',msg:'署名済み契約書（PDF・画像）が未保管です'});
+  const lr=lastReview(emp.id);
+  if(!lr) out.push({lv:'blue',code:'noreview',msg:'昇給検討の記録がまだありません'});
+  else if(daysBetween(lr.review_date,t)>365) out.push({lv:'blue',code:'oldreview',msg:`前回の昇給検討から1年以上経過（${fmtD(lr.review_date)}）`});
+  return out;
+}
+function statusPill(c){
+  if(!c) return '<span class="pill p-red">未登録</span>';
+  const cls={'締結済':'p-green','要確認':'p-amber','下書き':'p-gray','終了':'p-gray'}[c.status]||'p-gray';
+  return `<span class="pill ${cls}">${esc(c.status)}</span>`;
+}
+function wageText(c){ if(!c) return ''; return `${c.wage_type} ${yen(c.base_wage)}円`; }
+
+// ===== データ読み込み =====
+async function loadAll(){
+  const [emp, ws, loc, con, rev, bon, set, req] = await Promise.all([
+    sb.from('employees').select('id,code,name,hire_date,active,role,title,location_id,schedule,week_days,sort_order,email').order('code'),
+    sb.from('work_settings').select('employee_id,daily_hours,sched_in,sched_out,break_hours'),
+    sb.from('locations').select('id,name'),
+    sb.from('contracts').select('*'),
+    sb.from('wage_reviews').select('*'),
+    sb.from('bonuses').select('*'),
+    sb.from('hr_settings').select('*'),
+    sb.from('contract_sign_requests').select('*').order('created_at',{ascending:false})
+  ]);
+  for(const r of [emp,ws,loc,con,rev,bon,set,req]) if(r.error) throw r.error;
+  S.requests=req.data;
+  S.employees=emp.data; S.contracts=con.data; S.reviews=rev.data; S.bonuses=bon.data;
+  S.ws={}; ws.data.forEach(w=>S.ws[w.employee_id]=w);
+  S.locations={}; loc.data.forEach(l=>S.locations[l.id]=l.name);
+  S.settings={}; set.data.forEach(s=>S.settings[s.key]=s);
+}
+async function loadStats(from,to){
+  const { data, error } = await sb.rpc('hr_attendance_stats', { p_from: from, p_to: to });
+  if(error) throw error;
+  const m={}; data.forEach(r=>m[r.employee_id]=r); return m;
+}
+
+// ===== 画面切替 =====
+function showTab(name){
+  S.tab=name;
+  $$('#tabs button').forEach(b=>b.classList.toggle('on', b.dataset.tab===name));
+  ['dash','staff','review','sign','bonus','settings'].forEach(t=>$('#tab-'+t).classList.toggle('hidden', t!==name));
+  render();
+}
+function render(){
+  ({dash:renderDash, staff:renderStaff, review:renderReview, sign:renderSign, bonus:renderBonus, settings:renderSettings})[S.tab]();
+}
+
+// ===== ダッシュボード =====
+function renderDash(){
+  const staff=activeStaff();
+  const all=staff.map(e=>({e, a:alertsFor(e)}));
+  const cnt=code=>all.filter(x=>x.a.some(a=>a.code===code)).length;
+  const reds=all.flatMap(x=>x.a.filter(a=>a.lv==='red').map(a=>({...a,e:x.e})));
+  const ambers=all.flatMap(x=>x.a.filter(a=>a.lv==='amber').map(a=>({...a,e:x.e})));
+  const blues=all.flatMap(x=>x.a.filter(a=>a.lv==='blue').map(a=>({...a,e:x.e})));
+  const mw=setting('min_wage',{});
+  const line=a=>`<div class="alert ${a.lv}"><div class="who"><a href="#" data-emp="${a.e.id}">${esc(a.e.name)}</a></div><div class="msg">${esc(a.msg)}</div></div>`;
+  $('#tab-dash').innerHTML=`
+  <div class="kpis">
+    <div class="kpi"><div class="v">${staff.length}</div><div class="l">在籍者（管理者除く）</div></div>
+    <div class="kpi red"><div class="v">${cnt('expired')+cnt('none')}</div><div class="l">契約切れ・未登録</div></div>
+    <div class="kpi amber"><div class="v">${cnt('soon')}</div><div class="l">${esc(setting('review_rules',{}).alert_days||60)}日以内に満了</div></div>
+    <div class="kpi amber"><div class="v">${cnt('check')}</div><div class="l">内容の要確認</div></div>
+    <div class="kpi ${cnt('muki')?'red':''}"><div class="v">${cnt('muki')}</div><div class="l">無期転換の対応</div></div>
+    <div class="kpi ${cnt('minwage')?'red':''}"><div class="v">${cnt('minwage')}</div><div class="l">最低賃金未満</div></div>
+  </div>
+  ${signTodoCard()}
+  <div class="card">
+    <h2>すぐに対応が必要</h2>
+    ${reds.length? reds.map(line).join('') : '<p class="muted">ありません。</p>'}
+  </div>
+  <div class="card">
+    <h2>準備・確認が必要</h2>
+    ${ambers.length? ambers.map(line).join('') : '<p class="muted">ありません。</p>'}
+  </div>
+  <div class="card">
+    <h2>管理の抜け</h2>
+    ${blues.length? blues.map(line).join('') : '<p class="muted">ありません。</p>'}
+  </div>
+  <div class="card small muted">
+    最低賃金：${esc(mw.pref||'')} ${yen(mw.amount)}円（${fmtD(mw.effective)}発効）。毎年10月の改定後に「基準・設定」で更新してください。
+  </div>`;
+  $$('#tab-dash [data-emp]').forEach(a=>a.onclick=ev=>{ev.preventDefault(); openEmployee(a.dataset.emp);});
+  bindSignTodo($('#tab-dash'));
+}
+
+// ===== 従業員・契約一覧 =====
+let staffFilter={q:'',type:'',showInactive:false};
+function renderStaff(){
+  const t=todayStr();
+  let list=S.employees.filter(e=>e.role!=='admin' && (staffFilter.showInactive || e.active));
+  const rows=list.map(e=>{
+    const c=currentContract(e.id); const a=alertsFor(e); const fs=firstStart(e);
+    return {e,c,a,fs};
+  }).filter(r=>{
+    if(staffFilter.type && (r.c?.employment_type||'')!==staffFilter.type) return false;
+    if(staffFilter.q && !r.e.name.replace(/\s|　/g,'').includes(staffFilter.q.replace(/\s|　/g,''))) return false;
+    return true;
+  });
+  $('#tab-staff').innerHTML=`
+  <div class="card">
+    <div class="row" style="margin-bottom:12px">
+      <label class="f" style="width:200px"><span>氏名で検索</span><input type="text" id="sfQ" value="${esc(staffFilter.q)}"></label>
+      <label class="f" style="width:160px"><span>雇用形態</span><select id="sfType"><option value="">すべて</option>${EMP_TYPES.map(x=>`<option ${x===staffFilter.type?'selected':''}>${x}</option>`).join('')}</select></label>
+      <label class="checks"><input type="checkbox" id="sfInactive" ${staffFilter.showInactive?'checked':''}> 退職者も表示</label>
+    </div>
+    <div class="scroll">
+    <table class="t">
+      <thead><tr><th>No.</th><th>氏名</th><th>雇用形態</th><th>所属</th><th>入社日・勤続</th><th>現契約期間</th><th class="num">賃金</th><th>状態</th><th>残り</th><th>注意</th></tr></thead>
+      <tbody>${rows.map(({e,c,a,fs})=>{
+        const left=c&&c.end_date? daysBetween(t,c.end_date):null;
+        const leftTxt= c? (c.end_date? (left<0? `<span class="pill p-red">${-left}日超過</span>` : (left<=60? `<span class="pill p-amber">${left}日</span>`:`${left}日`)) : '<span class="muted">期間の定めなし</span>') : '';
+        const flags=a.filter(x=>x.lv!=='blue').map(x=>`<span class="pill ${x.lv==='red'?'p-red':'p-amber'}" title="${esc(x.msg)}">${({none:'未登録',expired:'期限切れ',soon:'満了間近',check:'要確認',muki:'無期転換',minwage:'最賃未満'})[x.code]}</span>`).join(' ');
+        return `<tr class="click" data-emp="${e.id}">
+          <td>${e.code}</td><td><b>${esc(e.name)}</b>${e.active?'':' <span class="pill p-gray">退職</span>'}<div class="small muted">${esc(e.title||'')}</div></td>
+          <td>${esc(c?.employment_type||'')}</td>
+          <td>${esc((c?.departments||[]).join('・'))}<div class="small muted">${esc((c?.work_locations||[]).join('・')||S.locations[e.location_id]||'')}</div></td>
+          <td>${fmtD(e.hire_date)}<div class="small muted">${tenureLabel(e.hire_date||fs)}</div></td>
+          <td>${c? `${fmtD(c.start_date)}〜${fmtD(c.end_date)}<div class="small muted">${c.seq}回目</div>`:''}</td>
+          <td class="num">${c? `${yen(c.base_wage)}<div class="small muted">${esc(c.wage_type)}</div>`:''}</td>
+          <td>${statusPill(c)}${draftOf(e.id)?' <span class="pill p-blue">下書きあり</span>':''}</td>
+          <td>${leftTxt}</td><td>${flags}</td></tr>`;}).join('')}
+      </tbody>
+    </table></div>
+  </div>`;
+  $('#sfQ').oninput=ev=>{staffFilter.q=ev.target.value; const pos=ev.target.selectionStart; renderStaff(); const i=$('#sfQ'); i.focus(); i.setSelectionRange(pos,pos);};
+  $('#sfType').onchange=ev=>{staffFilter.type=ev.target.value; renderStaff();};
+  $('#sfInactive').onchange=ev=>{staffFilter.showInactive=ev.target.checked; renderStaff();};
+  $$('#tab-staff tr[data-emp]').forEach(tr=>tr.onclick=()=>openEmployee(tr.dataset.emp));
+}
+
+// ===== モーダル =====
+function openModal(html, {wide=false}={}){
+  const root=$('#modalRoot');
+  root.innerHTML=`<div class="modal-bg"><div class="modal" style="${wide?'max-width:1200px':''}">${html}</div></div>`;
+  const bg=$('.modal-bg',root);
+  bg.addEventListener('mousedown',ev=>{ if(ev.target===bg) bg.dataset.down='1'; });
+  bg.addEventListener('mouseup',ev=>{ if(ev.target===bg && bg.dataset.down) closeModal(); bg.dataset.down=''; });
+  return $('.modal',root);
+}
+function closeModal(){ $('#modalRoot').innerHTML=''; }
+
+// ===== 従業員詳細 =====
+function openEmployee(empId){
+  const e=S.employees.find(x=>x.id===empId); if(!e) return;
+  const cs=contractsOf(empId); const cur=currentContract(empId); const al=alertsFor(e);
+  const rv=S.reviews.filter(r=>r.employee_id===empId).sort((a,b)=>b.review_date.localeCompare(a.review_date));
+  const bn=S.bonuses.filter(b=>b.employee_id===empId).sort((a,b)=>(b.pay_date||'').localeCompare(a.pay_date||''));
+  const ws=S.ws[empId]; const fs=firstStart(e);
+  const m=openModal(`
+    <h2>${esc(e.name)} <span class="muted small">No.${e.code} ${esc(e.title||'')}</span></h2>
+    ${al.map(a=>`<div class="alert ${a.lv}"><div class="msg">${esc(a.msg)}</div></div>`).join('')}
+    <div class="split" style="margin-top:10px">
+      <div>
+        <dl class="kv">
+          <dt>入社日</dt><dd>${fmtD(e.hire_date)||'未登録'}（勤続 ${tenureLabel(e.hire_date||fs)}）</dd>
+          <dt>初回契約開始</dt><dd>${fmtD(fs)}</dd>
+          <dt>現契約</dt><dd>${cur? `${esc(cur.employment_type)}／${fmtD(cur.start_date)}〜${fmtD(cur.end_date)||'定めなし'}／${wageText(cur)}`:'なし'}</dd>
+          <dt>時給換算</dt><dd>${cur&&hourlyEquivalent(cur)!=null? Math.floor(hourlyEquivalent(cur)).toLocaleString()+'円':''}</dd>
+        </dl>
+      </div>
+      <div>
+        <dl class="kv">
+          <dt>勤怠の勤務設定</dt><dd>${ws? `${(ws.sched_in||'').slice(0,5)}〜${(ws.sched_out||'').slice(0,5)}　休憩${ws.break_hours??''}h　所定${ws.daily_hours??''}h`:'なし'}</dd>
+          <dt>勤務日数</dt><dd>${esc(e.week_days||e.schedule||'')}</dd>
+          <dt>勤務場所</dt><dd>${esc(S.locations[e.location_id]||'')}</dd>
+        </dl>
+      </div>
+    </div>
+    <div class="row" style="margin:14px 0 6px">
+      <h3 style="margin:0;flex:1">契約履歴</h3>
+      <button class="btn pri" id="eRenew">${cur?'更新契約を作成':'契約を新規作成'}</button>
+      <button class="btn" id="eReview">昇給検討をする</button>
+    </div>
+    <div class="scroll"><table class="t">
+      <thead><tr><th>回</th><th>区分</th><th>雇用形態</th><th>期間</th><th class="num">賃金</th><th>状態</th><th>署名済み原本</th><th>理由・メモ</th><th></th></tr></thead>
+      <tbody>${cs.map(c=>`<tr>
+        <td>${c.seq}</td><td>${esc(c.change_type)}</td><td>${esc(c.employment_type)}</td>
+        <td>${fmtD(c.start_date)}〜${fmtD(c.end_date)||'定めなし'}</td>
+        <td class="num">${yen(c.base_wage)}<div class="small muted">${esc(c.wage_type)}</div></td>
+        <td>${statusPill(c)}${c.signed_date?`<div class="small muted">締結 ${fmtD(c.signed_date)}</div>`:''}</td>
+        <td>${c.file_path? `<button class="btn sm" data-view="${c.id}">表示</button> `:''}<label class="btn sm">${c.file_path?'差替':'保管'}<input type="file" accept="application/pdf,image/*" data-up="${c.id}" class="hidden"></label></td>
+        <td class="small">${esc(c.reason||'')}${c.reason&&c.note?'<br>':''}<span class="muted">${esc(c.note||'')}</span></td>
+        <td style="white-space:nowrap"><button class="btn sm" data-edit="${c.id}">編集</button> <button class="btn sm" data-print="${c.id}">印刷</button> ${c.status!=='終了'?`<button class="btn sm pri" data-send="${c.id}">署名依頼</button>`:''}${reqBadge(c)}</td>
+      </tr>`).join('') || '<tr><td colspan="9" class="muted">契約がありません</td></tr>'}</tbody>
+    </table></div>
+    <h3>昇給検討の記録</h3>
+    <div class="scroll"><table class="t">
+      <thead><tr><th>検討日</th><th>対象期間</th><th class="num">評価平均</th><th class="num">現賃金</th><th class="num">決定</th><th>結果</th><th>適用日</th><th>理由</th><th></th></tr></thead>
+      <tbody>${rv.map(r=>`<tr><td>${fmtD(r.review_date)}</td><td>${fmtD(r.period_from)}〜${fmtD(r.period_to)}</td><td class="num">${r.score_avg??''}</td><td class="num">${yen(r.current_wage)}</td><td class="num">${yen(r.decided_wage)}</td><td>${esc(r.decision||'')}</td><td>${fmtD(r.effective_date)}</td><td class="small">${esc(r.reason||'')}</td><td><button class="btn sm" data-rv="${r.id}">開く</button></td></tr>`).join('') || '<tr><td colspan="9" class="muted">記録がありません</td></tr>'}</tbody>
+    </table></div>
+    <h3>賞与・寸志</h3>
+    <div class="scroll"><table class="t">
+      <thead><tr><th>期</th><th>支給日</th><th class="num">金額</th><th>状態</th><th>メモ</th></tr></thead>
+      <tbody>${bn.map(b=>`<tr><td>${esc(b.period_label)}</td><td>${fmtD(b.pay_date)}</td><td class="num">${yen(b.amount)}</td><td>${esc(b.status)}</td><td class="small">${esc(b.note||'')}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">記録がありません</td></tr>'}</tbody>
+    </table></div>
+    <div class="foot"><button class="btn" id="eClose">閉じる</button></div>
+  `,{wide:true});
+  $('#eClose',m).onclick=closeModal;
+  $('#eRenew',m).onclick=()=>openContractForm(cur? renewFrom(cur) : newContractFor(e));
+  $('#eReview',m).onclick=()=>{ closeModal(); reviewState.empId=empId; reviewState.editing=null; showTab('review'); };
+  $$('[data-edit]',m).forEach(b=>b.onclick=()=>openContractForm({...S.contracts.find(c=>c.id==b.dataset.edit)}));
+  $$('[data-print]',m).forEach(b=>b.onclick=()=>printContract(S.contracts.find(c=>c.id==b.dataset.print)));
+  $$('[data-send]',m).forEach(b=>b.onclick=()=>openSendRequest(S.contracts.find(c=>c.id==b.dataset.send)));
+  $$('[data-view]',m).forEach(b=>b.onclick=()=>viewFile(S.contracts.find(c=>c.id==b.dataset.view)));
+  $$('[data-up]',m).forEach(inp=>inp.onchange=()=>uploadFile(S.contracts.find(c=>c.id==inp.dataset.up), inp.files[0]));
+  $$('[data-rv]',m).forEach(b=>b.onclick=()=>{ closeModal(); reviewState.empId=empId; reviewState.editing=S.reviews.find(r=>r.id==b.dataset.rv); showTab('review'); });
+}
+
+// ===== 契約書ファイルの保管 =====
+async function uploadFile(c, file){
+  if(!c||!file) return;
+  const ext=(file.name.split('.').pop()||'pdf').toLowerCase().replace(/[^a-z0-9]/g,'');
+  const e=S.employees.find(x=>x.id===c.employee_id);
+  const path=`${e.code}/${c.start_date}_${c.seq}_${Date.now()}.${ext}`;
+  const up=await sb.storage.from('contracts').upload(path, file, {upsert:false, contentType:file.type||undefined});
+  if(up.error){ alert('アップロードに失敗しました：'+up.error.message); return; }
+  const patch={file_path:path};
+  if(c.status!=='締結済' && confirm('署名済みの契約書として保管しました。この契約の状態を「締結済」にしますか？')){
+    patch.status='締結済'; if(!c.signed_date) patch.signed_date=todayStr();
+  }
+  const r=await sb.from('contracts').update(patch).eq('id',c.id).select().single();
+  if(r.error){ alert(r.error.message); return; }
+  Object.assign(c, r.data); toast('契約書を保管しました'); openEmployee(c.employee_id); render();
+}
+async function viewFile(c){
+  const r=await sb.storage.from('contracts').createSignedUrl(c.file_path, 300);
+  if(r.error){ alert(r.error.message); return; }
+  window.open(r.data.signedUrl,'_blank');
+}
+
+// ===== 契約フォーム =====
+function newContractFor(e){
+  const ws=S.ws[e.id]; const t=todayStr();
+  const start=t; const end=addDays(addMonths(start,12),-1);
+  const loc=S.locations[e.location_id];
+  return { employee_id:e.id, seq:1, change_type:'新規', employment_type:'パートタイム', is_fixed_term:true,
+    start_date:start, end_date:end, wage_type:'時給', base_wage:minWage()||'', allowances:[], work_locations: loc?[loc]:[], work_location_other:'',
+    departments:[], job_detail:'仕事については業種を特定せず、関連業務その他を手伝ってもらう場合があります',
+    shifts: ws&&ws.sched_in? [{label:'勤務1',in:ws.sched_in.slice(0,5),out:(ws.sched_out||'').slice(0,5),break_min:Math.round((ws.break_hours||0)*60)}] : [],
+    days_per_week:null, hours_per_day: ws?.daily_hours||null, weekly_hours:null, shift_based:true, variable_hours:false,
+    workers_comp:true, employment_insurance:true, social_insurance:false, renewal:'更新見込有り', renewal_cap:'∞',
+    raise_text:'なし（昇給については契約更新時に賃金改定を行うことがある）', bonus_text:'なし', retirement_allowance_text:'なし',
+    status:'下書き', signed_date:null, reason:'', note:'' };
+}
+function renewFrom(c){
+  const n=JSON.parse(JSON.stringify(c));
+  delete n.id; delete n.created_at; delete n.updated_at; n.file_path=null; n.signed_date=null;
+  const maxSeq=Math.max(...contractsOf(c.employee_id).map(x=>x.seq));
+  n.seq=maxSeq+1; n.change_type='条件変更なし更新'; n.status='下書き'; n.reason=''; n.note='';
+  const base = c.end_date ? addDays(c.end_date,1) : todayStr();
+  n.start_date = base;
+  n.end_date = c.is_fixed_term ? addDays(addMonths(n.start_date,12),-1) : null;
+  if(c.end_date && c.end_date < todayStr()) n.note=`前契約（${fmtD(c.end_date)}満了）の翌日から切れ目なく続く契約として作成。満了後も同じ条件で勤務していた期間を含みます`;
+  return n;
+}
+function openContractForm(c){
+  const e=S.employees.find(x=>x.id===c.employee_id);
+  const co=setting('company',{});
+  const locs=[...new Set([...(co.locations||[]), ...(c.work_locations||[])])];
+  const deps=[...new Set([...(co.departments||[]), ...(c.departments||[])])];
+  const isNew=!c.id;
+  const m=openModal(`
+    <h2>${isNew?'契約を作成':'契約を編集'}：${esc(e.name)}（${c.seq}回目）</h2>
+    <div class="grid g4">
+      <label class="f"><span>契約区分</span><select name="change_type">${CHANGE_TYPES.map(x=>`<option ${x===c.change_type?'selected':''}>${x}</option>`).join('')}</select></label>
+      <label class="f"><span>雇用形態</span><select name="employment_type">${EMP_TYPES.map(x=>`<option ${x===c.employment_type?'selected':''}>${x}</option>`).join('')}</select></label>
+      <label class="f"><span>契約期間</span><select name="is_fixed_term"><option value="1" ${c.is_fixed_term?'selected':''}>定めあり（有期）</option><option value="0" ${!c.is_fixed_term?'selected':''}>定めなし（無期）</option></select></label>
+      <label class="f"><span>状態</span><select name="status">${STATUSES.map(x=>`<option ${x===c.status?'selected':''}>${x}</option>`).join('')}</select></label>
+      <label class="f"><span>開始日</span><input type="date" name="start_date" value="${esc(c.start_date||'')}"></label>
+      <label class="f"><span>終了日</span><input type="date" name="end_date" value="${esc(c.end_date||'')}"></label>
+      <label class="f"><span>期間の目安</span><select id="fPeriod"><option value="">手入力</option><option value="3">3か月</option><option value="6">6か月</option><option value="12">1年</option><option value="18">1年6か月</option><option value="24">2年</option><option value="36">3年</option></select></label>
+      <label class="f"><span>締結日</span><input type="date" name="signed_date" value="${esc(c.signed_date||'')}"></label>
+    </div>
+    <h3>賃金</h3>
+    <div class="grid g4">
+      <label class="f"><span>賃金形態</span><select name="wage_type">${WAGE_TYPES.map(x=>`<option ${x===c.wage_type?'selected':''}>${x}</option>`).join('')}</select></label>
+      <label class="f"><span>基本給（円）</span><input type="number" name="base_wage" value="${esc(c.base_wage??'')}" step="10"></label>
+      <div class="f" style="grid-column:span 2"><span class="small muted" id="fWageCheck"></span></div>
+    </div>
+    <div class="small muted" style="margin:8px 0 4px">手当（契約書の賃金欄に印字）</div>
+    <div id="fAllow"></div>
+    <button class="btn sm" id="fAddAllow">手当を追加</button>
+    <h3>就業の場所・仕事の内容</h3>
+    <div class="grid g2">
+      <div><div class="small muted">就業の場所</div><div class="checks">${locs.map(x=>`<label><input type="checkbox" name="loc" value="${esc(x)}" ${(c.work_locations||[]).includes(x)?'checked':''}>${esc(x)}</label>`).join('')}</div>
+        <label class="f" style="margin-top:6px"><span>その他の場所</span><input type="text" name="work_location_other" value="${esc(c.work_location_other||'')}"></label></div>
+      <div><div class="small muted">仕事の内容（部署）</div><div class="checks">${deps.map(x=>`<label><input type="checkbox" name="dep" value="${esc(x)}" ${(c.departments||[]).includes(x)?'checked':''}>${esc(x)}</label>`).join('')}</div>
+        <label class="f" style="margin-top:6px"><span>仕事の内容（補足）</span><input type="text" name="job_detail" value="${esc(c.job_detail||'')}"></label></div>
+    </div>
+    <h3>勤務時間</h3>
+    <div id="fShifts"></div>
+    <button class="btn sm" id="fAddShift">勤務パターンを追加</button>
+    <div class="grid g4" style="margin-top:10px">
+      <label class="f"><span>週の勤務日数</span><input type="number" name="days_per_week" value="${esc(c.days_per_week??'')}" step="0.5"></label>
+      <label class="f"><span>1日の所定時間</span><input type="number" name="hours_per_day" value="${esc(c.hours_per_day??'')}" step="0.25"></label>
+      <label class="f"><span>週の所定時間</span><input type="number" name="weekly_hours" value="${esc(c.weekly_hours??'')}" step="0.25"></label>
+      <div class="checks" style="align-self:end"><label><input type="checkbox" name="shift_based" ${c.shift_based?'checked':''}>シフト制</label><label><input type="checkbox" name="variable_hours" ${c.variable_hours?'checked':''}>1箇月単位の変形労働時間制</label></div>
+    </div>
+    <h3>保険・更新・昇給等</h3>
+    <div class="grid g4">
+      <div class="checks"><label><input type="checkbox" name="workers_comp" ${c.workers_comp?'checked':''}>労災保険</label><label><input type="checkbox" name="employment_insurance" ${c.employment_insurance?'checked':''}>雇用保険</label><label><input type="checkbox" name="social_insurance" ${c.social_insurance?'checked':''}>社会保険</label></div>
+      <label class="f"><span>更新の有無</span><select name="renewal">${['更新見込有り','更新見込無し'].map(x=>`<option ${x===c.renewal?'selected':''}>${x}</option>`).join('')}</select></label>
+      <label class="f"><span>更新上限回数</span><input type="text" name="renewal_cap" value="${esc(c.renewal_cap||'')}"></label>
+      <div class="small muted" id="fInsCheck" style="align-self:end"></div>
+      <label class="f" style="grid-column:span 2"><span>昇給</span><input type="text" name="raise_text" value="${esc(c.raise_text||'')}"></label>
+      <label class="f"><span>賞与</span><input type="text" name="bonus_text" value="${esc(c.bonus_text||'')}"></label>
+      <label class="f"><span>退職金</span><input type="text" name="retirement_allowance_text" value="${esc(c.retirement_allowance_text||'')}"></label>
+    </div>
+    <h3>記録</h3>
+    <div class="grid g2">
+      <label class="f"><span>更新・変更の理由</span><textarea name="reason">${esc(c.reason||'')}</textarea></label>
+      <label class="f"><span>社内メモ（契約書には印字されません）</span><textarea name="note">${esc(c.note||'')}</textarea></label>
+    </div>
+    <div class="foot">
+      ${(!isNew && c.status==='下書き')?'<button class="btn danger" id="fDel" style="margin-right:auto">この下書きを削除</button>':''}
+      <button class="btn" id="fCancel">キャンセル</button>
+      <button class="btn" id="fPrint">保存して契約書を印刷</button>
+      <button class="btn pri" id="fSave">保存</button>
+    </div>`,{wide:true});
+
+  let allow=JSON.parse(JSON.stringify(c.allowances||[]));
+  let shifts=JSON.parse(JSON.stringify(c.shifts||[]));
+  const drawAllow=()=>{ $('#fAllow',m).innerHTML=allow.map((a,i)=>`<div class="row" style="margin-bottom:6px"><input type="text" placeholder="手当名" value="${esc(a.name||'')}" data-ai="${i}" data-k="name" style="width:200px"><input type="number" placeholder="金額" value="${esc(a.amount??'')}" data-ai="${i}" data-k="amount" style="width:140px"><input type="text" placeholder="備考（例：月額・上限あり）" value="${esc(a.memo||'')}" data-ai="${i}" data-k="memo" style="width:240px"><button class="btn sm danger" data-adel="${i}">削除</button></div>`).join('');
+    $$('[data-ai]',m).forEach(inp=>inp.oninput=()=>{ allow[inp.dataset.ai][inp.dataset.k]= inp.type==='number'? (inp.value===''?null:Number(inp.value)) : inp.value; });
+    $$('[data-adel]',m).forEach(b=>b.onclick=()=>{ allow.splice(b.dataset.adel,1); drawAllow(); }); };
+  const drawShifts=()=>{ $('#fShifts',m).innerHTML=`<table class="t"><thead><tr><th>名称</th><th>始業</th><th>終業</th><th>休憩（分）</th><th>実働</th><th></th></tr></thead><tbody>${shifts.map((s,i)=>`<tr><td><input type="text" value="${esc(s.label||'')}" data-si="${i}" data-k="label" style="width:110px"></td><td><input type="text" inputmode="numeric" placeholder="09:00" value="${esc(s.in||'')}" data-si="${i}" data-k="in" style="width:80px"></td><td><input type="text" inputmode="numeric" placeholder="17:00" value="${esc(s.out||'')}" data-si="${i}" data-k="out" style="width:80px"></td><td><input type="number" value="${esc(s.break_min??'')}" data-si="${i}" data-k="break_min" style="width:90px"></td><td class="small" data-sh="${i}">${shiftHours(s)}</td><td><button class="btn sm danger" data-sdel="${i}">削除</button></td></tr>`).join('')}</tbody></table>`;
+    $$('[data-si]',m).forEach(inp=>inp.oninput=()=>{ const s=shifts[inp.dataset.si]; s[inp.dataset.k]= inp.dataset.k==='break_min'? (inp.value===''?null:Number(inp.value)) : inp.value; $(`[data-sh="${inp.dataset.si}"]`,m).textContent=shiftHours(s); });
+    $$('[data-sdel]',m).forEach(b=>b.onclick=()=>{ shifts.splice(b.dataset.sdel,1); drawShifts(); }); };
+  drawAllow(); drawShifts();
+  $('#fAddAllow',m).onclick=()=>{ allow.push({name:'',amount:null,memo:''}); drawAllow(); };
+  $('#fAddShift',m).onclick=()=>{ if(shifts.length>=4){ alert('契約書の様式上、勤務パターンは4つまでです'); return; } shifts.push({label:`勤務${shifts.length+1}`,in:'09:00',out:'17:00',break_min:60}); drawShifts(); };
+
+  const F=n=>m.querySelector(`[name="${n}"]`);
+  $('#fPeriod',m).onchange=ev=>{ const mo=Number(ev.target.value); if(mo && F('start_date').value) F('end_date').value=addDays(addMonths(F('start_date').value,mo),-1); };
+  F('is_fixed_term').onchange=()=>{ if(F('is_fixed_term').value==='0') F('end_date').value=''; };
+  const check=()=>{
+    const tmp={wage_type:F('wage_type').value, base_wage:Number(F('base_wage').value), hours_per_day:Number(F('hours_per_day').value)||null, days_per_week:Number(F('days_per_week').value)||null, weekly_hours:Number(F('weekly_hours').value)||null};
+    const he=hourlyEquivalent(tmp); const mw=minWage();
+    const prev=contractsOf(c.employee_id).filter(x=>x.id!==c.id && x.status!=='下書き')[0];
+    let msg='';
+    if(he!=null && tmp.base_wage) msg+=`時給換算 ${Math.floor(he).toLocaleString()}円`;
+    if(mw && he!=null && he<mw) msg+=`　<b style="color:var(--red)">最低賃金（${mw.toLocaleString()}円）を下回っています</b>`;
+    if(prev && prev.wage_type===tmp.wage_type && tmp.base_wage) { const d=tmp.base_wage-prev.base_wage; msg+=`　前契約比 ${d>=0?'+':''}${d.toLocaleString()}円`; }
+    $('#fWageCheck',m).innerHTML=msg;
+    const wh=tmp.weekly_hours || (tmp.days_per_week&&tmp.hours_per_day? tmp.days_per_week*tmp.hours_per_day:0);
+    let ins='';
+    if(wh){ ins=`週${wh}時間：`; ins+= wh>=20? '雇用保険の加入対象' : '雇用保険の対象外（週20時間未満）'; if(wh>=30) ins+='、社会保険の加入対象（週30時間以上）'; }
+    $('#fInsCheck',m).textContent=ins;
+  };
+  ['wage_type','base_wage','hours_per_day','days_per_week','weekly_hours'].forEach(n=>F(n).addEventListener('input',check));
+  F('wage_type').addEventListener('change',check);
+  const autoWeekly=()=>{ const d=Number(F('days_per_week').value), h=Number(F('hours_per_day').value); if(d&&h) F('weekly_hours').value=Math.round(d*h*100)/100; check(); };
+  F('days_per_week').addEventListener('change',autoWeekly); F('hours_per_day').addEventListener('change',autoWeekly);
+  check();
+
+  const collect=()=>{
+    const o={...c};
+    ['change_type','employment_type','status','start_date','end_date','signed_date','wage_type','work_location_other','job_detail','renewal','renewal_cap','raise_text','bonus_text','retirement_allowance_text','reason','note'].forEach(n=>o[n]=F(n).value||null);
+    o.is_fixed_term=F('is_fixed_term').value==='1';
+    if(!o.is_fixed_term) o.end_date=null;
+    o.base_wage=F('base_wage').value===''?null:Number(F('base_wage').value);
+    ['days_per_week','hours_per_day','weekly_hours'].forEach(n=>o[n]=F(n).value===''?null:Number(F(n).value));
+    ['shift_based','variable_hours','workers_comp','employment_insurance','social_insurance'].forEach(n=>o[n]=F(n).checked);
+    o.work_locations=$$('[name=loc]:checked',m).map(x=>x.value);
+    o.departments=$$('[name=dep]:checked',m).map(x=>x.value);
+    o.allowances=allow.filter(a=>a.name);
+    o.shifts=shifts.filter(s=>s.in||s.out).map(s=>({...s, in:normTime(s.in), out:normTime(s.out)}));
+    const prevC=contractsOf(c.employee_id).filter(x=>x.id!==c.id && x.status!=='下書き')[0];
+    if(prevC && o.change_type==='条件変更なし更新' && o.base_wage!=null && (o.base_wage!==prevC.base_wage || o.wage_type!==prevC.wage_type)) o.change_type='賃金改定あり更新';
+    return o;
+  };
+  const save=async()=>{
+    const o=collect();
+    if(!o.start_date || o.base_wage==null){ alert('開始日と基本給は必須です'); return null; }
+    if(o.is_fixed_term && !o.end_date){ alert('有期契約の場合は終了日を入力してください'); return null; }
+    if(o.end_date && o.end_date<o.start_date){ alert('終了日が開始日より前になっています'); return null; }
+    const he=hourlyEquivalent(o); const mw=minWage();
+    if(mw && he!=null && he<mw && !confirm(`時給換算 ${Math.floor(he)}円は最低賃金 ${mw}円を下回っています。このまま保存しますか？`)) return null;
+    if(o.status==='締結済' && !o.signed_date) o.signed_date=todayStr();
+    const payload={...o}; delete payload.id; delete payload.created_at; delete payload.updated_at;
+    let r;
+    const openReqs = o.id ? S.requests.filter(x=>x.contract_id===o.id && ['送付済','閲覧済'].includes(x.status)) : [];
+    if(openReqs.length){
+      if(!confirm('この契約は署名依頼を送付済みです。内容を変更すると、送付済みのリンクは無効になります（あらためて署名依頼を送ってください）。保存しますか？')) return null;
+      await revokeRequests(openReqs.map(x=>x.id));
+    }
+    if(o.id) r=await sb.from('contracts').update(payload).eq('id',o.id).select().single();
+    else r=await sb.from('contracts').insert(payload).select().single();
+    if(r.error){ alert('保存に失敗しました：'+r.error.message); return null; }
+    const saved=r.data;
+    const i=S.contracts.findIndex(x=>x.id===saved.id); if(i>=0) S.contracts[i]=saved; else S.contracts.push(saved);
+    // 新しい契約が締結済になったら、それ以前の有効な契約を「終了」にする
+    if(saved.status==='締結済'){
+      const olds=S.contracts.filter(x=>x.employee_id===saved.employee_id && x.id!==saved.id && ['締結済','要確認'].includes(x.status) && x.start_date<saved.start_date);
+      if(olds.length && confirm(`以前の契約 ${olds.length}件を「終了」にしますか？（履歴として残ります）`)){
+        const u=await sb.from('contracts').update({status:'終了'}).in('id',olds.map(x=>x.id)).select();
+        if(!u.error) u.data.forEach(d=>{ const k=S.contracts.findIndex(x=>x.id===d.id); S.contracts[k]=d; });
+      }
+    }
+    toast('保存しました');
+    return saved;
+  };
+  $('#fCancel',m).onclick=()=>openEmployee(c.employee_id);
+  $('#fSave',m).onclick=async()=>{ const s=await save(); if(s){ openEmployee(s.employee_id); render(); } };
+  $('#fPrint',m).onclick=async()=>{ const s=await save(); if(s){ openEmployee(s.employee_id); render(); printContract(s); } };
+  if($('#fDel',m)) $('#fDel',m).onclick=async()=>{ if(!confirm('この下書きを削除しますか？')) return; const r=await sb.from('contracts').delete().eq('id',c.id); if(r.error){alert(r.error.message);return;} S.contracts=S.contracts.filter(x=>x.id!==c.id); openEmployee(c.employee_id); render(); };
+}
+function normTime(v){
+  if(!v) return '';
+  let t=String(v).replace(/[０-９：]/g,c=>c==='：'?':':String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/\s/g,'');
+  let m=t.match(/^(\d{1,2}):?(\d{2})$/); if(!m) return t;
+  const h=Number(m[1]), mi=Number(m[2]); if(h>29||mi>59) return t;
+  return `${pad(h)}:${pad(mi)}`;
+}
+function shiftHours(s){
+  const a=normTime(s.in), b=normTime(s.out);
+  if(!/^\d\d:\d\d$/.test(a)||!/^\d\d:\d\d$/.test(b)) return '';
+  const [h1,m1]=a.split(':').map(Number), [h2,m2]=b.split(':').map(Number);
+  const mins=(h2*60+m2)-(h1*60+m1)-(Number(s.break_min)||0);
+  return mins>0? (Math.round(mins/60*100)/100)+'時間' : '';
+}
+
+// ===== 契約書の印刷 =====
+function snapshotFor(c){
+  const e=S.employees.find(x=>x.id===c.employee_id);
+  return CR.buildSnapshot({ contract:c, employee:e, company:setting('company',{}), text:setting('contract_text',null),
+    mkYears:setting('review_rules',{}).mukitenkan_years||5, firstStart:firstStart(e) });
+}
+function printContract(c){
+  $('#printArea').innerHTML=CR.render(snapshotFor(c),{fixed:true});
+  setTimeout(()=>window.print(),50);
+}
+function signedOpts(r){
+  return { signed:{name:r.signer_name, address:r.signer_address, signature:r.signature, signed_at:r.signed_at},
+    audit:{ email:r.email, created_at:r.created_at, opened_at:r.opened_at, hash:r.snapshot_hash, ip:r.signer_ip, ua:r.signer_ua,
+      agreements_labels: CR.AGREEMENTS.filter(a=>r.agreements && r.agreements[a.key]).map(a=>a.label) } };
+}
+function printSigned(r){
+  $('#printArea').innerHTML=CR.render(r.snapshot, {...signedOpts(r), fixed:true});
+  setTimeout(()=>window.print(),50);
+}
+
+// ===== 署名依頼（電子契約） =====
+function signUrl(r){ return PUBLIC_BASE + 'sign.html?t=' + r.token; }
+function reqsOf(contractId){ return S.requests.filter(r=>r.contract_id===contractId); }
+function activeReq(contractId){ return reqsOf(contractId).find(r=>['送付済','閲覧済','署名済'].includes(r.status)) || null; }
+function signedReqOfEmp(empId){ return S.requests.find(r=>r.employee_id===empId && r.status==='署名済') || null; }
+function reqBadge(c){
+  const r=activeReq(c.id); if(!r) return '';
+  const cls={'送付済':'p-blue','閲覧済':'p-amber','署名済':'p-green'}[r.status];
+  return `<div class="small" style="margin-top:4px"><span class="pill ${cls}">${r.status==='署名済'?'電子署名済':r.status==='閲覧済'?'署名待ち（閲覧済）':'署名待ち（未読）'}</span></div>`;
+}
+function textApproved(){ const t=setting('contract_text',null); return !!(t && t.approved); }
+function mailParts(r, c, e){
+  const co=setting('company',{});
+  const period = c.end_date ? `${fmtD(c.start_date)}〜${fmtD(c.end_date)}` : `${fmtD(c.start_date)}から`;
+  const subject = `【${co.name||'THE HERBS'}】雇用契約書の確認と署名のお願い`;
+  const body =
+`${e.name} さん
+
+いつもありがとうございます。
+雇用契約書（契約期間：${period}）をお送りします。
+下記のリンクから内容を確認し、${fmtD(r.expires_at.slice(0,10))}までに署名をお願いします。スマートフォンからも開けます。
+
+${signUrl(r)}
+
+内容でわからないことがあれば、署名の前に遠慮なくご相談ください。
+紙での受け取りを希望する場合も、署名せずにお知らせください。
+
+${co.name||''}
+${(co.representative||'').replace(/^代表取締役\s*/,'')}
+`;
+  return {subject, body};
+}
+function openMail(r){
+  const c=S.contracts.find(x=>x.id===r.contract_id); const e=S.employees.find(x=>x.id===r.employee_id);
+  const {subject, body}=mailParts(r,c,e);
+  location.href=`mailto:${encodeURIComponent(r.email||'')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+function openGmail(r){
+  const c=S.contracts.find(x=>x.id===r.contract_id); const e=S.employees.find(x=>x.id===r.employee_id);
+  const {subject, body}=mailParts(r,c,e);
+  window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(r.email||'')}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`,'_blank');
+}
+async function copyText(t){ try{ await navigator.clipboard.writeText(t); toast('コピーしました'); }catch(e){ prompt('コピーしてください', t); } }
+async function revokeRequests(ids){
+  if(!ids.length) return;
+  const r=await sb.from('contract_sign_requests').update({status:'取消', revoked_at:new Date().toISOString()}).in('id',ids).select();
+  if(r.error){ alert(r.error.message); return; }
+  r.data.forEach(d=>{ const i=S.requests.findIndex(x=>x.id===d.id); if(i>=0) S.requests[i]=d; });
+}
+function openSendRequest(c){
+  const e=S.employees.find(x=>x.id===c.employee_id);
+  const cur=activeReq(c.id);
+  if(cur && cur.status==='署名済'){ alert('この契約はすでに電子署名済みです。「署名状況」から確認できます。'); return; }
+  if(!textApproved()){
+    if(confirm('契約書の文面（前文・条文）がまだ確定していません。「基準・設定」の「契約書の文面」で内容を確認し、確定してから送付してください。\n\n今すぐ文面の確認画面を開きますか？')){ closeModal(); showTab('settings'); }
+    return;
+  }
+  const warn=[];
+  if(c.status==='下書き') warn.push('この契約は「下書き」です。内容を確認してから送ってください。');
+  const he=hourlyEquivalent(c); if(minWage() && he!=null && he<minWage()) warn.push('時給換算が最低賃金を下回っています。');
+  if(c.end_date && c.end_date<todayStr()) warn.push(`契約期間（${fmtD(c.end_date)}まで）がすでに終わっています。更新契約を作成して送るのが通常です。`);
+  const m=openModal(`
+    <h2>署名依頼：${esc(e.name)}（第${c.seq}回 ${fmtD(c.start_date)}〜${fmtD(c.end_date)||'定めなし'}）</h2>
+    ${cur?`<div class="alert amber"><div class="msg">送付済みの依頼（${fmtD(cur.created_at.slice(0,10))}・${esc(cur.status)}）があります。新しく送ると、前のリンクは無効になります。</div></div>`:''}
+    ${warn.map(w=>`<div class="alert red"><div class="msg">${esc(w)}</div></div>`).join('')}
+    <div class="grid g3">
+      <label class="f"><span>送付先メールアドレス</span><input type="email" id="sqEmail" value="${esc(e.email||'')}"></label>
+      <label class="f"><span>署名の期限</span><select id="sqDays"><option value="7">7日後</option><option value="14" selected>14日後</option><option value="30">30日後</option></select></label>
+      <div style="align-self:end"><button class="btn" id="sqPreview">送る内容を確認（印刷プレビュー）</button></div>
+    </div>
+    <p class="small muted" style="margin-top:10px">「依頼を作成」を押すと、この時点の契約内容が固定され、本人専用の署名リンクが作られます。続けてメールを作成する画面が開くので、内容を確認して送信してください。</p>
+    <div id="sqResult"></div>
+    <div class="foot">
+      <button class="btn" id="sqCancel">閉じる</button>
+      <button class="btn pri" id="sqCreate">依頼を作成</button>
+    </div>`);
+  $('#sqCancel',m).onclick=()=>openEmployee(c.employee_id);
+  $('#sqPreview',m).onclick=()=>printContract(c);
+  $('#sqCreate',m).onclick=async()=>{
+    const email=$('#sqEmail',m).value.trim();
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ alert('メールアドレスを確認してください'); return; }
+    const days=Number($('#sqDays',m).value);
+    if(cur) await revokeRequests([cur.id]);
+    const exp=new Date(Date.now()+days*86400000); exp.setHours(23,59,59,0);
+    const payload={ contract_id:c.id, employee_id:c.employee_id, email, snapshot:snapshotFor(c), expires_at:exp.toISOString() };
+    const r=await sb.from('contract_sign_requests').insert(payload).select().single();
+    if(r.error){ alert('作成できませんでした：'+r.error.message); return; }
+    S.requests.unshift(r.data);
+    $('#sqCreate',m).classList.add('hidden');
+    $('#sqResult',m).innerHTML=`<div class="alert blue"><div class="msg"><b>署名リンクを作成しました。</b>メールで本人に送ってください。<br><span class="small" style="word-break:break-all">${esc(signUrl(r.data))}</span></div></div>
+      <div class="row"><button class="btn pri" id="sqMail">メールを作成（Outlook等）</button><button class="btn" id="sqGmail">Gmailで作成</button><button class="btn" id="sqCopy">リンクをコピー</button></div>`;
+    $('#sqMail',m).onclick=()=>openMail(r.data);
+    $('#sqGmail',m).onclick=()=>openGmail(r.data);
+    $('#sqCopy',m).onclick=()=>copyText(signUrl(r.data));
+    openMail(r.data);
+    render();
+  };
+}
+
+// ダッシュボード：契約書の取り交わし
+function signTodo(){
+  const t=todayStr(); const out=[];
+  for(const e of activeStaff()){
+    const cur=currentContract(e.id); const dr=draftOf(e.id);
+    if(!cur){ out.push({e, kind:'none', label:'契約未登録', c:dr}); continue; }
+    if(cur.is_fixed_term && cur.end_date && cur.end_date<t){ out.push({e, kind:'expired', label:`${fmtD(cur.end_date)}に満了`, c:dr, cur}); continue; }
+    const r=activeReq(cur.id);
+    if(r && r.status==='署名済') continue;
+    if(cur.file_path) continue;
+    out.push({e, kind:r?'waiting':'unsigned', label: r? `署名待ち（${r.status}）` : (cur.status==='要確認'?'内容の確認と署名が必要':'署名済み原本なし'), c:cur, req:r});
+  }
+  return out;
+}
+function signTodoCard(){
+  const list=signTodo(); if(!list.length) return '';
+  const nExp=list.filter(x=>x.kind==='expired' && !x.c).length;
+  return `<div class="card">
+    <div class="row" style="margin-bottom:8px"><h2 style="flex:1;margin:0">契約書の取り交わし（${list.length}名）</h2>
+      ${nExp?`<button class="btn pri" id="bulkDraft">期限切れ${nExp}名の更新契約を下書きでまとめて作成</button>`:''}</div>
+    ${textApproved()?'':'<div class="alert amber"><div class="msg">送付の前に「基準・設定」→「契約書の文面」で前文・条文を確認し、確定してください。</div></div>'}
+    <div class="scroll"><table class="t"><thead><tr><th>氏名</th><th>状況</th><th>次にすること</th><th></th></tr></thead><tbody>
+    ${list.map(x=>{
+      let next='', btn='';
+      if(x.kind==='none'){ next= x.c? '下書きを確認して署名依頼' : '契約を作成'; btn= x.c? `<button class="btn sm" data-todo-edit="${x.c.id}">下書きを開く</button>` : `<button class="btn sm" data-emp-open="${x.e.id}">作成する</button>`; }
+      else if(x.kind==='expired'){ next= x.c? '下書きの内容を確認して署名依頼' : '更新契約（下書き）を作成'; btn= x.c? `<button class="btn sm" data-todo-edit="${x.c.id}">下書きを開く</button> <button class="btn sm pri" data-todo-send="${x.c.id}">署名依頼</button>` : `<button class="btn sm" data-emp-open="${x.e.id}">開く</button>`; }
+      else if(x.kind==='waiting'){ next='本人の署名待ち'; btn=`<button class="btn sm" data-todo-mail="${x.req.id}">メールを再作成</button>`; }
+      else { next='内容を確認して署名依頼'; btn=`<button class="btn sm" data-todo-edit="${x.c.id}">内容を確認</button> <button class="btn sm pri" data-todo-send="${x.c.id}">署名依頼</button>`; }
+      return `<tr><td><a href="#" data-emp="${x.e.id}"><b>${esc(x.e.name)}</b></a></td><td>${esc(x.label)}${x.c&&x.c.status==='下書き'?' <span class="pill p-blue">下書きあり</span>':''}</td><td>${esc(next)}</td><td style="white-space:nowrap">${btn}</td></tr>`;
+    }).join('')}
+    </tbody></table></div>
+    <p class="small muted" style="margin:8px 0 0">更新契約は、前の契約が満了した翌日から切れ目なく続く形で作ります（満了後も同じ条件で働いていた期間を含みます）。賃金などを変える場合は下書きを開いて修正してください。</p>
+  </div>`;
+}
+function bindSignTodo(root){
+  if($('#bulkDraft',root)) $('#bulkDraft',root).onclick=bulkDrafts;
+  $$('[data-todo-edit]',root).forEach(b=>b.onclick=()=>openContractForm({...S.contracts.find(c=>c.id==b.dataset.todoEdit)}));
+  $$('[data-todo-send]',root).forEach(b=>b.onclick=()=>openSendRequest(S.contracts.find(c=>c.id==b.dataset.todoSend)));
+  $$('[data-todo-mail]',root).forEach(b=>b.onclick=()=>openMail(S.requests.find(r=>r.id==b.dataset.todoMail)));
+  $$('[data-emp-open]',root).forEach(b=>b.onclick=()=>openEmployee(b.dataset.empOpen));
+}
+async function bulkDrafts(){
+  const list=signTodo().filter(x=>x.kind==='expired' && !x.c);
+  if(!confirm(`${list.map(x=>x.e.name).join('、')}\n\nの更新契約を「下書き」で作成します。条件は前の契約と同じで、前の契約の満了日の翌日から1年間です。作成後、一人ずつ内容を確認してから署名依頼を送ってください。`)) return;
+  const rows=list.map(x=>{ const n=renewFrom(x.cur); delete n.id; return n; });
+  const r=await sb.from('contracts').insert(rows).select();
+  if(r.error){ alert('作成できませんでした：'+r.error.message); return; }
+  S.contracts.push(...r.data); toast(`${r.data.length}件の下書きを作成しました`); render();
+}
+
+// 署名状況タブ
+let signFilter='open';
+function renderSign(){
+  const el=$('#tab-sign');
+  const all=S.requests;
+  const counts={open:all.filter(r=>['送付済','閲覧済'].includes(r.status)).length, signed:all.filter(r=>r.status==='署名済').length, all:all.length};
+  const list= signFilter==='open'? all.filter(r=>['送付済','閲覧済'].includes(r.status)) : signFilter==='signed'? all.filter(r=>r.status==='署名済') : all;
+  const now=new Date().toISOString();
+  const unstored=all.filter(r=>r.status==='署名済' && !r.pdf_path);
+  el.innerHTML=`<div class="card">
+    <div class="row" style="margin-bottom:10px">
+      <h2 style="flex:1;margin:0">署名状況</h2>
+      ${unstored.length?`<button class="btn pri" id="sgStoreAll">署名済み${unstored.length}件をPDFで保管</button>`:''}
+    </div>
+    <div class="row" style="margin-bottom:10px">
+      ${[['open','署名待ち'],['signed','署名済み'],['all','すべて']].map(([k,l])=>`<button class="btn sm ${signFilter===k?'pri':''}" data-sf="${k}">${l}（${counts[k]}）</button>`).join('')}
+    </div>
+    <div class="scroll"><table class="t"><thead><tr><th>氏名</th><th>契約</th><th>送付</th><th>状態</th><th>閲覧</th><th>署名</th><th>期限</th><th></th></tr></thead><tbody>
+    ${list.map(r=>{ const c=S.contracts.find(x=>x.id===r.contract_id)||r.snapshot.contract; const expired= r.status!=='署名済' && r.status!=='取消' && r.expires_at<now;
+      const cls={'送付済':'p-blue','閲覧済':'p-amber','署名済':'p-green','取消':'p-gray'}[r.status];
+      return `<tr>
+      <td><b>${esc(empName(r.employee_id))}</b><div class="small muted">${esc(r.email||'')}</div></td>
+      <td>第${esc(c.seq)}回 ${fmtD(c.start_date)}〜${fmtD(c.end_date)||'定めなし'}<div class="small muted">${esc(c.employment_type)} ${yen(c.base_wage)}円</div></td>
+      <td>${CR.jstDateTime(r.created_at).slice(0,16)}</td>
+      <td><span class="pill ${cls}">${esc(r.status)}</span>${expired?' <span class="pill p-red">期限切れ</span>':''}${r.pdf_path?' <span class="pill p-gray">PDF保管済</span>':''}</td>
+      <td>${r.opened_at?CR.jstDateTime(r.opened_at).slice(0,16):'<span class="muted">未読</span>'}</td>
+      <td>${r.signed_at?CR.jstDateTime(r.signed_at).slice(0,16):''}</td>
+      <td>${r.status==='署名済'||r.status==='取消'?'':fmtD(r.expires_at.slice(0,10))}</td>
+      <td style="white-space:nowrap">${r.status==='署名済'
+        ? `<button class="btn sm pri" data-sv="${r.id}">表示・印刷</button> ${r.pdf_path?`<button class="btn sm" data-sp="${r.id}">PDF</button>`:`<button class="btn sm" data-ss="${r.id}">PDF保管</button>`}`
+        : r.status==='取消' ? '' : `<button class="btn sm" data-sm="${r.id}">メール再作成</button> <button class="btn sm" data-sc="${r.id}">リンク</button> ${expired?`<button class="btn sm" data-sr="${r.contract_id}">再送</button>`:''} <button class="btn sm danger" data-sx="${r.id}">取消</button>`}</td></tr>`; }).join('') || '<tr><td colspan="8" class="muted">ありません</td></tr>'}
+    </tbody></table></div>
+  </div>`;
+  $$('[data-sf]',el).forEach(b=>b.onclick=()=>{ signFilter=b.dataset.sf; renderSign(); });
+  const R=id=>S.requests.find(r=>r.id==id);
+  $$('[data-sm]',el).forEach(b=>b.onclick=()=>openMail(R(b.dataset.sm)));
+  $$('[data-sc]',el).forEach(b=>b.onclick=()=>copyText(signUrl(R(b.dataset.sc))));
+  $$('[data-sr]',el).forEach(b=>b.onclick=()=>openSendRequest(S.contracts.find(c=>c.id==b.dataset.sr)));
+  $$('[data-sx]',el).forEach(b=>b.onclick=async()=>{ if(!confirm('この署名依頼を取り消しますか？送ったリンクは使えなくなります。')) return; await revokeRequests([Number(b.dataset.sx)]); renderSign(); });
+  $$('[data-sv]',el).forEach(b=>b.onclick=()=>viewSigned(R(b.dataset.sv)));
+  $$('[data-ss]',el).forEach(b=>b.onclick=async()=>{ b.disabled=true; b.textContent='作成中…'; await storeSignedPdf(R(b.dataset.ss)); renderSign(); });
+  $$('[data-sp]',el).forEach(b=>b.onclick=async()=>{ const r=R(b.dataset.sp); const u=await sb.storage.from('contracts').createSignedUrl(r.pdf_path,300); if(u.error){alert(u.error.message);return;} window.open(u.data.signedUrl,'_blank'); });
+  if($('#sgStoreAll',el)) $('#sgStoreAll',el).onclick=async()=>{ const b=$('#sgStoreAll',el); b.disabled=true; let i=0; for(const r of unstored){ b.textContent=`作成中… ${++i}/${unstored.length}`; await storeSignedPdf(r); } toast('保管しました'); renderSign(); };
+}
+function viewSigned(r){
+  const m=openModal(`<h2>電子署名済みの契約書：${esc(empName(r.employee_id))}</h2>
+    <div style="background:#f3f3ef;padding:12px;max-height:65vh;overflow:auto">${CR.render(r.snapshot, {...signedOpts(r), fixed:true})}</div>
+    <div class="foot"><button class="btn" id="svClose">閉じる</button><button class="btn" id="svPrint">印刷</button>${r.pdf_path?'':'<button class="btn pri" id="svStore">PDFで保管</button>'}</div>`,{wide:true});
+  $('#svClose',m).onclick=closeModal;
+  $('#svPrint',m).onclick=()=>printSigned(r);
+  if($('#svStore',m)) $('#svStore',m).onclick=async()=>{ await storeSignedPdf(r); closeModal(); render(); };
+}
+async function signedPdfBlob(r){
+  const pdf=await CR.toPdf(CR.render(r.snapshot, {...signedOpts(r), fixed:true}));
+  return pdf.output('blob');
+}
+async function storeSignedPdf(r){
+  try{
+    const blob=await signedPdfBlob(r);
+    const e=S.employees.find(x=>x.id===r.employee_id); const c=S.contracts.find(x=>x.id===r.contract_id);
+    const path=`${e.code}/signed_${c?c.start_date:''}_${r.contract_id}_${r.id}.pdf`;
+    const up=await sb.storage.from('contracts').upload(path, blob, {upsert:true, contentType:'application/pdf'});
+    if(up.error) throw up.error;
+    const u1=await sb.from('contract_sign_requests').update({pdf_path:path}).eq('id',r.id).select().single();
+    if(u1.error) throw u1.error;
+    Object.assign(r,u1.data);
+    if(c){ const u2=await sb.from('contracts').update({file_path:path}).eq('id',c.id).select().single(); if(!u2.error) Object.assign(c,u2.data); }
+  }catch(err){ alert('PDFの保管に失敗しました：'+(err.message||err)); }
+}
+
+// ===== 契約書の文面（基準・設定） =====
+function contractTextCard(){
+  const cur=setting('contract_text',null); const T=CR.mergeText(cur);
+  const lines=a=>esc((a||[]).join('\n'));
+  return `<div class="card" id="ctCard">
+    <div class="row"><h2 style="flex:1;margin:0">契約書の文面</h2>
+      ${cur&&cur.approved?`<span class="pill p-green">確定済み ${cur.approved_at?esc(CR.jstDateTime(cur.approved_at).slice(0,16)):''}</span>`:'<span class="pill p-amber">未確定（案）</span>'}</div>
+    <p class="small muted">全員の契約書に共通で入る文章です。確定すると署名依頼を送れるようになります。送付済みの契約書は、送った時点の文面のまま固定されます。</p>
+    <div class="note" style="margin-bottom:12px">元の契約書から変えた点（案）：<br>
+      1. 冒頭に「契約にあたって ― THE HERBSの考え方」を追加<br>
+      2. 時間外労働：「届出を怠った場合は時間外手当の支払いを拒否することがある」→「承認のない時間外労働は認めない。ただし実際に働いた時間は法令に基づき支払う」<br>
+      3. 退職の注記：「期中の解約は実損に基づき損害賠償を請求することがある」→「故意または重大な過失による損害は、実際の損害の範囲で賠償を求めることがある」<br>
+      4. 入社誓約4：「故意又は過失により…全部又は一部の賠償」→「故意又は重大な過失により…実際に生じた損害の範囲で賠償」</div>
+    <div class="grid g2">
+      <div>
+        <label class="checks" style="margin-bottom:6px"><input type="checkbox" id="ctPreOn" ${T.preamble.enabled?'checked':''}> 前文（当社の考え方）を入れる</label>
+        <label class="f"><span>前文の見出し</span><input type="text" id="ctPreTitle" value="${esc(T.preamble.title||'')}"></label>
+        <label class="f" style="margin-top:8px"><span>前文の本文（1行1段落。行頭に # を付けると小見出し）</span><textarea id="ctPreBody" style="min-height:260px">${esc(T.preamble.body||'')}</textarea></label>
+      </div>
+      <div class="grid">
+        <label class="f"><span>時間外労働などの注意（1行1項目）</span><textarea id="ctOver" style="min-height:110px">${lines(T.overtime)}</textarea></label>
+        <label class="f"><span>休暇（1行1項目）</span><textarea id="ctLeave">${lines(T.leave)}</textarea></label>
+        <label class="f"><span>賃金の注記</span><input type="text" id="ctWageNote" value="${esc(T.wageNote||'')}"></label>
+        <label class="f"><span>退職の注記（1つ目の退職事由の下）</span><textarea id="ctRetNote">${esc(T.retireNote||'')}</textarea></label>
+      </div>
+    </div>
+    <details style="margin-top:12px"><summary class="small" style="cursor:pointer">そのほかの条文（退職事由・更新要件・アピアランス・服務心得・通勤手当・入社誓約）</summary>
+      <div class="grid g2" style="margin-top:8px">
+        <label class="f"><span>退職事由（1行1項目）</span><textarea id="ctRetire">${lines(T.retire)}</textarea></label>
+        <label class="f"><span>更新の前提</span><textarea id="ctRenLead">${esc(T.renewalLead||'')}</textarea></label>
+        <label class="f"><span>更新の要件（1行1項目）</span><textarea id="ctRenReq">${lines(T.renewalReq)}</textarea></label>
+        <label class="f"><span>アピアランス 前文</span><textarea id="ctApLead">${esc(T.appearance.lead||'')}</textarea></label>
+        <label class="f"><span>アピアランス 項目（1行1項目）</span><textarea id="ctApItems">${lines(T.appearance.items)}</textarea></label>
+        <label class="f"><span>アピアランス 結び（1行1文）</span><textarea id="ctApTail">${lines(T.appearance.tail)}</textarea></label>
+        <label class="f"><span>服務心得（1行1項目）</span><textarea id="ctService" style="min-height:200px">${lines(T.service)}</textarea></label>
+        <label class="f"><span>入社誓約（1行1項目）</span><textarea id="ctPledge" style="min-height:200px">${lines(T.pledge)}</textarea></label>
+        <label class="f"><span>通勤手当の注記</span><textarea id="ctCommute">${esc(T.commute||'')}</textarea></label>
+      </div>
+    </details>
+    <div class="row" style="margin-top:12px">
+      <button class="btn" id="ctPreview">見本を印刷</button>
+      <button class="btn" id="ctReset">元の契約書の文面に戻す</button>
+      <span style="flex:1"></span>
+      <button class="btn" id="ctSave">保存（案のまま）</button>
+      <button class="btn pri" id="ctApprove">保存して確定</button>
+    </div>
+  </div>`;
+}
+function bindContractText(){
+  const L=id=>$(id).value.split('\n').map(x=>x.replace(/\s+$/,'')).filter(x=>x.trim());
+  const collect=()=>({
+    preamble:{enabled:$('#ctPreOn').checked, title:$('#ctPreTitle').value, body:$('#ctPreBody').value},
+    overtime:L('#ctOver'), leave:L('#ctLeave'), wageNote:$('#ctWageNote').value, retireNote:$('#ctRetNote').value,
+    retire:L('#ctRetire'), renewalLead:$('#ctRenLead').value, renewalReq:L('#ctRenReq'),
+    appearance:{lead:$('#ctApLead').value, items:L('#ctApItems'), tail:L('#ctApTail')},
+    service:L('#ctService'), pledge:L('#ctPledge'), commute:$('#ctCommute').value });
+  $('#ctSave').onclick=()=>saveSetting('contract_text',{...collect(), approved:false});
+  $('#ctApprove').onclick=()=>{ if(!confirm('この文面で確定します。以後の署名依頼にはこの文面が使われます。よろしいですか？')) return; saveSetting('contract_text',{...collect(), approved:true, approved_at:new Date().toISOString()}); };
+  $('#ctReset').onclick=()=>{ if(!confirm('元の契約書の文面（前文なし・修正前の条文）を入力欄に戻します。保存するまで反映されません。')) return;
+    const O=CR.ORIGINAL_TEXT; $('#ctPreOn').checked=false; $('#ctOver').value=O.overtime.join('\n'); $('#ctLeave').value=O.leave.join('\n'); $('#ctWageNote').value=O.wageNote;
+    $('#ctRetNote').value=O.retireNote; $('#ctRetire').value=O.retire.join('\n'); $('#ctRenLead').value=O.renewalLead; $('#ctRenReq').value=O.renewalReq.join('\n');
+    $('#ctApLead').value=O.appearance.lead; $('#ctApItems').value=O.appearance.items.join('\n'); $('#ctApTail').value=O.appearance.tail.join('\n');
+    $('#ctService').value=O.service.join('\n'); $('#ctPledge').value=O.pledge.join('\n'); $('#ctCommute').value=O.commute; };
+  $('#ctPreview').onclick=()=>{
+    const e=activeStaff()[0]; const c=currentContract(e?.id) || S.contracts[0]; if(!c){ alert('見本にできる契約がありません'); return; }
+    const emp=S.employees.find(x=>x.id===c.employee_id);
+    $('#printArea').innerHTML=CR.render(CR.buildSnapshot({contract:c, employee:emp, company:setting('company',{}), text:collect(), mkYears:5, firstStart:firstStart(emp)}),{fixed:true});
+    setTimeout(()=>window.print(),50);
+  };
+}
+
+// ===== 昇給検討 =====
+const reviewState={empId:null, from:null, to:null, editing:null, scores:{}};
+async function ensureStats(from,to){
+  const key=from+'_'+to;
+  if(S.statsRange!==key){ S.stats=await loadStats(from,to); S.statsRange=key; }
+  return S.stats;
+}
+function raiseFor(avg, wageType){
+  const rules=setting('review_rules',{});
+  const table = (wageType==='時給') ? (rules.raise_table||[]) : (wageType==='月給'||wageType==='日給月給') ? (rules.raise_table_monthly||[]) : [];
+  const sorted=[...table].sort((a,b)=>b.min-a.min);
+  return sorted.find(r=>avg>=r.min) || null;
+}
+function gradeFor(wage){
+  const gs=setting('wage_grades',[]);
+  return gs.find(g=>wage>=g.min && wage<=g.max) || null;
+}
+async function renderReview(){
+  const el=$('#tab-review');
+  const t=todayStr();
+  if(!reviewState.to) reviewState.to=t;
+  if(!reviewState.from) reviewState.from=addDays(addMonths(t,-12),1);
+  el.innerHTML=`<div class="card"><p class="muted">勤怠実績を集計しています…</p></div>`;
+  let stats;
+  try{ stats=await ensureStats(reviewState.from, reviewState.to); }
+  catch(err){ el.innerHTML=`<div class="card warn">勤怠実績の取得に失敗しました：${esc(err.message)}</div>`; return; }
+  if(S.tab!=='review') return;
+  const rules=setting('review_rules',{}); const g=rules.attendance_guide||{};
+  const staff=activeStaff();
+  const rows=staff.map(e=>{ const c=currentContract(e.id); const st=stats[e.id]||{}; const lr=lastReview(e.id); return {e,c,st,lr}; });
+  el.innerHTML=`
+  <div class="card">
+    <h2>昇給検討の一覧</h2>
+    <div class="row" style="margin-bottom:10px">
+      <label class="f"><span>集計期間（開始）</span><input type="date" id="rvFrom" value="${reviewState.from}"></label>
+      <label class="f"><span>集計期間（終了）</span><input type="date" id="rvTo" value="${reviewState.to}"></label>
+      <button class="btn" id="rvReload">再集計</button>
+      <span class="small muted">勤怠システムの打刻・申請データから集計（勤怠システム稼働日 2026/7/17 以降のみ）。遅刻・早退はシフトまたは勤務設定の時刻との比較です。</span>
+    </div>
+    <div class="scroll"><table class="t">
+      <thead><tr><th>氏名</th><th>雇用形態</th><th class="num">現賃金</th><th>等級</th><th class="num">出勤日</th><th class="num">欠勤</th><th class="num">有給</th><th class="num">遅刻</th><th class="num">早退</th><th class="num">実働時間</th><th>前回検討</th><th></th></tr></thead>
+      <tbody>${rows.map(({e,c,st,lr})=>{
+        const gr=c&&c.wage_type==='時給'? gradeFor(c.base_wage):null;
+        const late=st.late_count||0, abs=st.absence_days||0;
+        return `<tr>
+        <td><b>${esc(e.name)}</b></td><td>${esc(c?.employment_type||'')}</td>
+        <td class="num">${c?yen(c.base_wage):''}<div class="small muted">${esc(c?.wage_type||'')}</div></td>
+        <td>${gr?esc(gr.grade):''}</td>
+        <td class="num">${st.worked_days??''}</td>
+        <td class="num">${abs>(g.absence_max??99)?`<span class="pill p-amber">${abs}</span>`:abs}</td>
+        <td class="num">${st.paid_leave_days??''}</td>
+        <td class="num">${late>(g.late_max??99)?`<span class="pill p-amber">${late}</span>`:late}</td>
+        <td class="num">${st.early_count??''}</td>
+        <td class="num">${st.worked_hours??''}</td>
+        <td>${lr? `${fmtD(lr.review_date)}<div class="small muted">${esc(lr.decision||'')}</div>`:'<span class="muted">なし</span>'}</td>
+        <td><button class="btn sm ${reviewState.empId===e.id?'pri':''}" data-pick="${e.id}">検討する</button></td></tr>`;}).join('')}</tbody>
+    </table></div>
+  </div>
+  <div id="rvSheet"></div>`;
+  $('#rvReload').onclick=()=>{ reviewState.from=$('#rvFrom').value; reviewState.to=$('#rvTo').value; S.statsRange=null; renderReview(); };
+  $$('[data-pick]',el).forEach(b=>b.onclick=()=>{ reviewState.empId=b.dataset.pick; reviewState.editing=null; renderReview(); });
+  if(reviewState.empId) drawReviewSheet(stats);
+}
+function drawReviewSheet(stats){
+  const box=$('#rvSheet'); const e=S.employees.find(x=>x.id===reviewState.empId); if(!e){box.innerHTML='';return;}
+  const c=currentContract(e.id); const st=stats[e.id]||{};
+  const rules=setting('review_rules',{}); const items=rules.items||[];
+  const ed=reviewState.editing;
+  const scores= ed? {...(ed.scores||{})} : {};
+  const curWage= ed? ed.current_wage : (c?.base_wage ?? null);
+  const metrics= ed? (ed.metrics||{}) : st;
+  const mw=minWage();
+  box.innerHTML=`
+  <div class="card">
+    <h2>${ed?'昇給検討の記録':'昇給検討シート'}：${esc(e.name)}</h2>
+    <div class="split">
+      <div>
+        <h3 style="margin-top:0">実績（${fmtD(ed?ed.period_from:reviewState.from)}〜${fmtD(ed?ed.period_to:reviewState.to)}）</h3>
+        <dl class="kv">
+          <dt>現契約</dt><dd>${c? `${esc(c.employment_type)}／${wageText(c)}／${fmtD(c.start_date)}〜${fmtD(c.end_date)||'定めなし'}`:'なし'}</dd>
+          <dt>勤続</dt><dd>${tenureLabel(e.hire_date||firstStart(e))}</dd>
+          <dt>出勤・欠勤</dt><dd>出勤 ${metrics.worked_days??'-'}日／欠勤 ${metrics.absence_days??'-'}日／有給 ${metrics.paid_leave_days??'-'}日</dd>
+          <dt>遅刻・早退</dt><dd>遅刻 ${metrics.late_count??'-'}回／早退 ${metrics.early_count??'-'}回（目安：遅刻${rules.attendance_guide?.late_max??'-'}回・欠勤${rules.attendance_guide?.absence_max??'-'}日以内）</dd>
+          <dt>実働時間</dt><dd>${metrics.worked_hours??'-'}時間／残業申請 ${metrics.overtime_requests??'-'}件</dd>
+        </dl>
+        <h3>評価（1〜5）</h3>
+        <table class="t"><tbody>${items.map(it=>`<tr><td>${esc(it.label)}</td><td><div class="score" data-item="${esc(it.key)}">${[1,2,3,4,5].map(n=>`<button type="button" data-n="${n}" class="${scores[it.key]==n?'on':''}">${n}</button>`).join('')}</div></td></tr>`).join('')}</tbody></table>
+        <div class="small muted" style="margin-top:6px">5 特に優秀／4 期待以上／3 期待どおり／2 やや不足／1 要改善</div>
+      </div>
+      <div>
+        <h3 style="margin-top:0">判定</h3>
+        <div id="rvCalc" class="note"></div>
+        <div class="grid g2" style="margin-top:10px">
+          <label class="f"><span>提案額（円）</span><input type="number" id="rvProp" step="10" value="${esc(ed?.proposed_wage??'')}"></label>
+          <label class="f"><span>決定額（円）</span><input type="number" id="rvDec" step="10" value="${esc(ed?.decided_wage??'')}"></label>
+          <label class="f"><span>結果</span><select id="rvDecision">${['検討中','昇給','据え置き','降給','保留'].map(x=>`<option ${x===(ed?.decision||'検討中')?'selected':''}>${x}</option>`).join('')}</select></label>
+          <label class="f"><span>適用日</span><input type="date" id="rvEff" value="${esc(ed?.effective_date || (c?.end_date? addDays(c.end_date,1):''))}"></label>
+          <label class="f"><span>承認者</span><input type="text" id="rvAppr" value="${esc(ed?.approver||'')}"></label>
+          <label class="f"><span>検討日</span><input type="date" id="rvDate" value="${esc(ed?.review_date||todayStr())}"></label>
+        </div>
+        <label class="f" style="margin-top:10px"><span>理由（本人への説明に使える内容で）</span><textarea id="rvReason">${esc(ed?.reason||'')}</textarea></label>
+        <label class="f" style="margin-top:10px"><span>面談メモ・今後の期待</span><textarea id="rvComment">${esc(ed?.comment||'')}</textarea></label>
+      </div>
+    </div>
+    <div class="foot">
+      ${ed?'<button class="btn danger" id="rvDel" style="margin-right:auto">この記録を削除</button>':''}
+      <button class="btn" id="rvClose">閉じる</button>
+      <button class="btn" id="rvToContract">保存して更新契約を作成</button>
+      <button class="btn pri" id="rvSave">保存</button>
+    </div>
+  </div>`;
+  const calc=()=>{
+    const vals=items.map(it=>Number(scores[it.key])).filter(Boolean);
+    const avg= vals.length? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length*100)/100 : null;
+    const r= avg!=null? raiseFor(avg, c?.wage_type) : null;
+    const suggested=r? r.raise : null;
+    let html='';
+    if(avg==null) html='評価を入力すると、昇給の目安が表示されます。';
+    else{
+      html=`評価平均 <b>${avg}</b>${r&&r.label?`（${esc(r.label)}）`:''}<br>基準による昇給目安：<b>${suggested!=null? '+'+yen(suggested)+'円':'基準なし'}</b>`;
+      if(curWage!=null && suggested!=null){
+        let p=curWage+suggested;
+        if(c?.wage_type==='時給' && mw && p<mw){ html+=`<br><span class="warn">最低賃金 ${yen(mw)}円に満たないため、最低賃金以上への引上げが必要です</span>`; p=mw; }
+        html+=`<br>提案額：${yen(curWage)} → <b>${yen(p)}円</b>`;
+        const gr=c?.wage_type==='時給'? gradeFor(p):null;
+        const gs=setting('wage_grades',[]);
+        if(c?.wage_type==='時給' && gs.length){ const top=Math.max(...gs.map(x=>x.max)); html+= gr? `<br>時給レンジ：${esc(gr.grade)} ${esc(gr.label)}（${yen(gr.min)}〜${yen(gr.max)}円）` : (p>top? `<br><span class="warn">時給レンジの上限（${yen(top)}円）を超えます。役割・等級の見直しを検討してください</span>`:''); }
+        if(!$('#rvProp').dataset.touched) $('#rvProp').value=p;
+      }
+    }
+    if(c?.wage_type==='時給' && mw && curWage!=null && curWage<mw) html=`<span class="warn">現在の時給 ${yen(curWage)}円は最低賃金 ${yen(mw)}円を下回っています。適用日を待たず速やかに改定が必要です。</span><br>`+html;
+    $('#rvCalc').innerHTML=html;
+    return {avg, suggested};
+  };
+  $$('.score',box).forEach(sc=>$$('button',sc).forEach(b=>b.onclick=()=>{ scores[sc.dataset.item]=Number(b.dataset.n); $$('button',sc).forEach(x=>x.classList.toggle('on',x===b)); calc(); }));
+  $('#rvProp').oninput=ev=>ev.target.dataset.touched='1';
+  $('#rvDec').oninput=()=>{ const d=Number($('#rvDec').value); if(curWage!=null && d){ $('#rvDecision').value= d>curWage?'昇給': d<curWage?'降給':'据え置き'; } };
+  calc();
+  const save=async()=>{
+    const {avg,suggested}=calc();
+    const o={ employee_id:e.id, contract_id:c?.id??null, review_date:$('#rvDate').value||todayStr(),
+      period_from: ed? ed.period_from : reviewState.from, period_to: ed? ed.period_to : reviewState.to,
+      metrics: ed? ed.metrics : st, scores, score_avg:avg, current_wage:curWage, suggested_raise:suggested,
+      proposed_wage: $('#rvProp').value===''?null:Number($('#rvProp').value),
+      decided_wage: $('#rvDec').value===''?null:Number($('#rvDec').value),
+      effective_date: $('#rvEff').value||null, decision:$('#rvDecision').value, approver:$('#rvAppr').value||null,
+      reason:$('#rvReason').value||null, comment:$('#rvComment').value||null };
+    let r;
+    if(ed) r=await sb.from('wage_reviews').update(o).eq('id',ed.id).select().single();
+    else r=await sb.from('wage_reviews').insert(o).select().single();
+    if(r.error){ alert('保存に失敗しました：'+r.error.message); return null; }
+    const i=S.reviews.findIndex(x=>x.id===r.data.id); if(i>=0) S.reviews[i]=r.data; else S.reviews.push(r.data);
+    reviewState.editing=r.data; toast('保存しました'); return r.data;
+  };
+  $('#rvSave').onclick=async()=>{ if(await save()) renderReview(); };
+  $('#rvClose').onclick=()=>{ reviewState.empId=null; reviewState.editing=null; renderReview(); };
+  $('#rvToContract').onclick=async()=>{
+    const r=await save(); if(!r) return;
+    if(!c){ openContractForm(newContractFor(e)); return; }
+    const n=renewFrom(c);
+    const w=r.decided_wage ?? r.proposed_wage;
+    if(w!=null && w!==c.base_wage){ n.base_wage=w; n.change_type='賃金改定あり更新'; }
+    if(r.effective_date){ n.start_date=r.effective_date; if(n.is_fixed_term) n.end_date=addDays(addMonths(n.start_date,12),-1); }
+    n.reason=[r.decision, r.reason].filter(Boolean).join('：');
+    openContractForm(n);
+  };
+  if($('#rvDel')) $('#rvDel').onclick=async()=>{ if(!confirm('この記録を削除しますか？')) return; const d=await sb.from('wage_reviews').delete().eq('id',ed.id); if(d.error){alert(d.error.message);return;} S.reviews=S.reviews.filter(x=>x.id!==ed.id); reviewState.editing=null; renderReview(); };
+  box.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+// ===== 賞与 =====
+const bonusState={label:'', from:'', to:'', pay:'', rows:null};
+function coefFrom(table, v){ const s=[...(table||[])].sort((a,b)=>b.min-a.min); const r=s.find(x=>v>=x.min); return r? r.coef : 1; }
+function defaultBonusPeriod(){
+  const t=parseD(todayStr()); const y=t.getFullYear();
+  // 冬季：5/11〜11/10（12月支給）、夏季：11/11〜5/10（7月支給）
+  const m=t.getMonth()+1;
+  if(m>=6 && m<=12) return {label:`${y}年冬季`, from:`${y}-05-11`, to:`${y}-11-10`, pay:`${y}-12-10`};
+  const py = m<=5? y-1 : y;
+  return {label:`${py+1}年夏季`, from:`${py}-11-11`, to:`${py+1}-05-10`, pay:`${py+1}-07-10`};
+}
+async function renderBonus(){
+  const el=$('#tab-bonus');
+  if(!bonusState.label){ Object.assign(bonusState, defaultBonusPeriod()); }
+  const br=setting('bonus_rules',{});
+  const saved=S.bonuses.filter(b=>b.period_label===bonusState.label);
+  const periods=[...new Set(S.bonuses.map(b=>b.period_label))];
+  el.innerHTML=`
+  <div class="card">
+    <h2>賞与・寸志の試算</h2>
+    <div class="row" style="margin-bottom:10px">
+      <label class="f"><span>期の名称</span><input type="text" id="bnLabel" value="${esc(bonusState.label)}" style="width:150px"></label>
+      <label class="f"><span>算定期間（開始）</span><input type="date" id="bnFrom" value="${esc(bonusState.from)}"></label>
+      <label class="f"><span>算定期間（終了）</span><input type="date" id="bnTo" value="${esc(bonusState.to)}"></label>
+      <label class="f"><span>支給日</span><input type="date" id="bnPay" value="${esc(bonusState.pay)}"></label>
+      <button class="btn pri" id="bnCalc">試算する</button>
+      ${periods.length?`<label class="f"><span>保存済みの期</span><select id="bnPick"><option value="">選択</option>${periods.map(p=>`<option ${p===bonusState.label?'selected':''}>${esc(p)}</option>`).join('')}</select></label>`:''}
+    </div>
+    <div class="note">支給額 ＝ 基準額 × 評価係数 × 出勤率係数（1,000円未満切り捨て）。対象：${esc(br.eligibility||'')}<br>
+    評価係数は算定期間内（なければ直近）の昇給検討の評価平均から、出勤率は 出勤日 ÷（出勤日＋欠勤日）で算出します。金額は手で修正できます。${bonusState.from<'2026-07-17'?'<br>勤怠システム稼働（2026/7/17）より前の期間は出勤率の計算に含まれません。':''}</div>
+    <div id="bnTable" style="margin-top:12px">${saved.length && !bonusState.rows? bonusSavedTable(saved) : ''}</div>
+  </div>`;
+  $('#bnCalc').onclick=async()=>{ Object.assign(bonusState,{label:$('#bnLabel').value, from:$('#bnFrom').value, to:$('#bnTo').value, pay:$('#bnPay').value}); await calcBonus(); };
+  if($('#bnPick')) $('#bnPick').onchange=ev=>{ if(!ev.target.value) return; const b=S.bonuses.find(x=>x.period_label===ev.target.value); Object.assign(bonusState,{label:b.period_label, from:b.calc_from, to:b.calc_to, pay:b.pay_date, rows:null}); renderBonus(); };
+  if(bonusState.rows) drawBonusRows();
+  bindSavedBonus();
+}
+function bonusSavedTable(saved){
+  const total=saved.reduce((a,b)=>a+(b.amount||0),0);
+  return `<h3>保存済み：${esc(bonusState.label)}</h3><table class="t"><thead><tr><th>氏名</th><th class="num">基準額</th><th class="num">評価係数</th><th class="num">出勤率</th><th class="num">出勤係数</th><th class="num">金額</th><th>状態</th><th>メモ</th></tr></thead><tbody>
+  ${saved.map(b=>`<tr><td>${esc(empName(b.employee_id))}</td><td class="num">${yen(b.base_amount)}</td><td class="num">${b.eval_coef??''}</td><td class="num">${b.attendance_rate!=null?Math.round(b.attendance_rate*1000)/10+'%':''}</td><td class="num">${b.attendance_coef??''}</td><td class="num"><b>${yen(b.amount)}</b></td><td><select data-bst="${b.id}">${['試算','決定','支給済'].map(x=>`<option ${x===b.status?'selected':''}>${x}</option>`).join('')}</select></td><td class="small">${esc(b.note||'')}</td></tr>`).join('')}
+  <tr><td><b>合計</b></td><td colspan="4"></td><td class="num"><b>${yen(total)}</b></td><td colspan="2"></td></tr></tbody></table>
+  <div class="row" style="margin-top:8px"><button class="btn" id="bnRecalc">再試算（上書き）</button></div>`;
+}
+function bindSavedBonus(){
+  $$('[data-bst]').forEach(s=>s.onchange=async()=>{ const r=await sb.from('bonuses').update({status:s.value}).eq('id',s.dataset.bst).select().single(); if(r.error){alert(r.error.message);return;} const i=S.bonuses.findIndex(x=>x.id===r.data.id); S.bonuses[i]=r.data; toast('更新しました'); });
+  if($('#bnRecalc')) $('#bnRecalc').onclick=()=>calcBonus();
+}
+async function calcBonus(){
+  const br=setting('bonus_rules',{});
+  $('#bnTable').innerHTML='<p class="muted">集計中…</p>';
+  let stats; try{ stats=await loadStats(bonusState.from, bonusState.to); }catch(err){ $('#bnTable').innerHTML=`<p class="warn">${esc(err.message)}</p>`; return; }
+  const rows=activeStaff().map(e=>{
+    const c=currentContract(e.id); const st=stats[e.id]||{};
+    const type=c?.employment_type||'';
+    const base=(br.base||{})[type];
+    let baseAmount=0;
+    if(base){ baseAmount = base.kind==='months' ? Math.round((c?.base_wage||0)*base.value) : Number(base.value||0); if(base.kind==='months' && c && c.wage_type==='時給'){ baseAmount=Math.round(c.base_wage*(c.weekly_hours||0)*52/12*base.value); } }
+    const rvs=S.reviews.filter(r=>r.employee_id===e.id && r.score_avg!=null).sort((a,b)=>b.review_date.localeCompare(a.review_date));
+    const rvIn=rvs.find(r=>r.review_date>=bonusState.from && r.review_date<=addMonths(bonusState.to,1)) || rvs[0];
+    const avg=rvIn? Number(rvIn.score_avg) : null;
+    const evalCoef= avg!=null? coefFrom(br.eval_coef, avg) : 1;
+    const wd=st.worked_days||0, ab=st.absence_days||0;
+    const rate= (wd+ab)>0? wd/(wd+ab) : null;
+    const attCoef= rate!=null? coefFrom(br.attendance_coef, rate) : 1;
+    const hire=e.hire_date||firstStart(e);
+    const eligible= !!hire && hire<=bonusState.from;
+    const amount= eligible? Math.floor(baseAmount*evalCoef*attCoef/1000)*1000 : 0;
+    const notes=[]; if(!eligible) notes.push('算定期間の途中入社のため対象外（基準）'); if(avg==null) notes.push('評価記録なし：係数1.0で仮計算'); if(rate==null) notes.push('勤怠データなし');
+    if(!c) notes.push('契約未登録のため基準額なし');
+    return {e, c, baseAmount, evalCoef, rate, attCoef, amount, note:notes.join('／'), eligible};
+  });
+  bonusState.rows=rows; drawBonusRows();
+}
+function drawBonusRows(){
+  const rows=bonusState.rows;
+  const total=()=>rows.reduce((a,r)=>a+(Number(r.amount)||0),0);
+  $('#bnTable').innerHTML=`<h3>試算結果：${esc(bonusState.label)}</h3>
+  <div class="scroll"><table class="t"><thead><tr><th>氏名</th><th>雇用形態</th><th class="num">基準額</th><th class="num">評価係数</th><th class="num">出勤率</th><th class="num">出勤係数</th><th class="num">支給額</th><th>メモ</th></tr></thead><tbody>
+  ${rows.map((r,i)=>`<tr><td>${esc(r.e.name)}</td><td>${esc(r.c?.employment_type||'')}</td><td class="num">${yen(r.baseAmount)}</td><td class="num">${r.evalCoef}</td><td class="num">${r.rate!=null?Math.round(r.rate*1000)/10+'%':'-'}</td><td class="num">${r.attCoef}</td><td class="num"><input type="number" step="1000" value="${r.amount}" data-bi="${i}" style="width:110px;text-align:right"></td><td class="small muted">${esc(r.note)}</td></tr>`).join('')}
+  <tr><td><b>合計</b></td><td colspan="5"></td><td class="num"><b id="bnTotal">${yen(total())}</b></td><td></td></tr></tbody></table></div>
+  <div class="row" style="margin-top:10px"><button class="btn pri" id="bnSave">この内容で保存</button><span class="small muted">同じ期の保存済みデータは置き換えます</span></div>`;
+  $$('[data-bi]').forEach(inp=>inp.oninput=()=>{ rows[inp.dataset.bi].amount=Number(inp.value)||0; $('#bnTotal').textContent=yen(total()); });
+  $('#bnSave').onclick=async()=>{
+    const old=S.bonuses.filter(b=>b.period_label===bonusState.label).map(b=>b.id);
+    if(old.length){ if(!confirm(`保存済みの「${bonusState.label}」${old.length}件を置き換えます。よろしいですか？`)) return; const d=await sb.from('bonuses').delete().in('id',old); if(d.error){alert(d.error.message);return;} S.bonuses=S.bonuses.filter(b=>!old.includes(b.id)); }
+    const payload=rows.map(r=>({employee_id:r.e.id, period_label:bonusState.label, calc_from:bonusState.from||null, calc_to:bonusState.to||null, base_amount:r.baseAmount, eval_coef:r.evalCoef, attendance_rate:r.rate, attendance_coef:r.attCoef, amount:Number(r.amount)||0, pay_date:bonusState.pay||null, status:'試算', note:r.note||null}));
+    const ins=await sb.from('bonuses').insert(payload).select();
+    if(ins.error){ alert(ins.error.message); return; }
+    S.bonuses.push(...ins.data); bonusState.rows=null; toast('保存しました'); renderBonus();
+  };
+}
+
+// ===== 基準・設定 =====
+function renderSettings(){
+  const el=$('#tab-settings');
+  const mw=setting('min_wage',{}); const rr=setting('review_rules',{}); const gr=setting('wage_grades',[]); const br=setting('bonus_rules',{}); const co=setting('company',{});
+  el.innerHTML=`
+  <div class="card">
+    <div class="row"><h2 style="flex:1;margin:0">運用基準</h2><button class="btn pri" id="stPolicy">運用基準書を印刷</button></div>
+    <p class="small muted">ここで決めた基準が、アラート・昇給検討・賞与試算・契約書に使われます。初期値は「案」です。社労士とも確認のうえ確定してください。</p>
+  </div>
+  ${contractTextCard()}
+  <div class="card">
+    <h2>最低賃金</h2>
+    <div class="grid g4">
+      <label class="f"><span>都道府県</span><input type="text" id="mwPref" value="${esc(mw.pref||'')}"></label>
+      <label class="f"><span>時間額（円）</span><input type="number" id="mwAmt" value="${esc(mw.amount??'')}"></label>
+      <label class="f"><span>発効日</span><input type="date" id="mwEff" value="${esc(mw.effective||'')}"></label>
+      <div style="align-self:end"><button class="btn pri" id="mwSave">保存</button></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>契約更新・見直しのルール</h2>
+    <div class="grid g4">
+      <label class="f"><span>契約満了アラート（日前）</span><input type="number" id="rrAlert" value="${esc(rr.alert_days??60)}"></label>
+      <label class="f"><span>無期転換の通算年数</span><input type="number" id="rrMk" value="${esc(rr.mukitenkan_years??5)}"></label>
+      <label class="f"><span>遅刻の目安（期間内・回）</span><input type="number" id="rrLate" value="${esc(rr.attendance_guide?.late_max??3)}"></label>
+      <label class="f"><span>欠勤の目安（期間内・日）</span><input type="number" id="rrAbs" value="${esc(rr.attendance_guide?.absence_max??3)}"></label>
+    </div>
+    <h3>評価項目</h3>
+    <div id="edItems"></div>
+    <h3>昇給テーブル（時給）</h3>
+    <div id="edRaise"></div>
+    <h3>昇給テーブル（月給）</h3>
+    <div id="edRaiseM"></div>
+    <div class="row" style="margin-top:10px"><button class="btn pri" id="rrSave">保存</button></div>
+  </div>
+  <div class="card">
+    <h2>時給レンジ（パート・アルバイト）</h2>
+    <div id="edGrades"></div>
+    <div class="row" style="margin-top:10px"><button class="btn pri" id="grSave">保存</button></div>
+  </div>
+  <div class="card">
+    <h2>賞与・寸志の基準</h2>
+    <label class="f"><span>支給対象</span><input type="text" id="brElig" value="${esc(br.eligibility||'')}"></label>
+    <h3>支給時期</h3><div id="edPeriods"></div>
+    <h3>基準額（雇用形態別）</h3>
+    <table class="t"><thead><tr><th>雇用形態</th><th>計算方法</th><th>値</th></tr></thead><tbody>
+      ${EMP_TYPES.map(t=>{ const b=(br.base||{})[t]||{kind:'fixed',value:0}; return `<tr><td>${t}</td><td><select data-bk="${t}"><option value="months" ${b.kind==='months'?'selected':''}>月額の◯か月分</option><option value="fixed" ${b.kind==='fixed'?'selected':''}>定額（円）</option></select></td><td><input type="number" step="0.1" data-bv="${t}" value="${esc(b.value)}" style="width:140px"></td></tr>`; }).join('')}
+    </tbody></table>
+    <h3>評価係数</h3><div id="edEval"></div>
+    <h3>出勤率係数</h3><div id="edAtt"></div>
+    <div class="row" style="margin-top:10px"><button class="btn pri" id="brSave">保存</button></div>
+  </div>
+  <div class="card">
+    <h2>会社情報（契約書に印字）</h2>
+    <div class="grid g3">
+      <label class="f"><span>名称</span><input type="text" id="coName" value="${esc(co.name||'')}"></label>
+      <label class="f"><span>所在地</span><input type="text" id="coAddr" value="${esc(co.address||'')}"></label>
+      <label class="f"><span>代表者</span><input type="text" id="coRep" value="${esc(co.representative||'')}"></label>
+      <label class="f"><span>相談窓口 部署名</span><input type="text" id="coDept" value="${esc(co.contact_dept||'')}"></label>
+      <label class="f"><span>相談窓口 担当者</span><input type="text" id="coCName" value="${esc(co.contact_name||'')}"></label>
+      <label class="f"><span>相談窓口 連絡先</span><input type="text" id="coTel" value="${esc(co.contact_tel||'')}"></label>
+      <label class="f"><span>賃金締日</span><input type="number" id="coClose" value="${esc(co.closing_day??10)}"></label>
+      <label class="f"><span>賃金支払日</span><input type="number" id="coPay" value="${esc(co.pay_day??25)}"></label>
+    </div>
+    <div class="grid g2" style="margin-top:10px">
+      <label class="f"><span>就業場所の選択肢（1行に1つ）</span><textarea id="coLocs">${esc((co.locations||[]).join('\n'))}</textarea></label>
+      <label class="f"><span>部署の選択肢（1行に1つ）</span><textarea id="coDeps">${esc((co.departments||[]).join('\n'))}</textarea></label>
+    </div>
+    <div class="row" style="margin-top:10px"><button class="btn pri" id="coSave">保存</button></div>
+  </div>`;
+  const items=tableEditor($('#edItems'), [{k:'label',l:'項目名',w:360}], JSON.parse(JSON.stringify(rr.items||[])));
+  const raise=tableEditor($('#edRaise'), [{k:'min',l:'評価平均がこれ以上',t:'number',w:140},{k:'raise',l:'昇給額（円）',t:'number',w:120},{k:'label',l:'ランク',w:200}], JSON.parse(JSON.stringify(rr.raise_table||[])));
+  const raiseM=tableEditor($('#edRaiseM'), [{k:'min',l:'評価平均がこれ以上',t:'number',w:140},{k:'raise',l:'昇給額（円）',t:'number',w:120}], JSON.parse(JSON.stringify(rr.raise_table_monthly||[])));
+  const grades=tableEditor($('#edGrades'), [{k:'grade',l:'等級',w:70},{k:'label',l:'役割・要件',w:300},{k:'min',l:'下限（円）',t:'number',w:110},{k:'max',l:'上限（円）',t:'number',w:110}], JSON.parse(JSON.stringify(gr)));
+  const periods=tableEditor($('#edPeriods'), [{k:'label',l:'名称',w:100},{k:'calc',l:'算定期間',w:160},{k:'pay',l:'支給月',w:100}], JSON.parse(JSON.stringify(br.periods||[])));
+  const evalC=tableEditor($('#edEval'), [{k:'min',l:'評価平均がこれ以上',t:'number',w:140},{k:'coef',l:'係数',t:'number',w:100}], JSON.parse(JSON.stringify(br.eval_coef||[])));
+  const attC=tableEditor($('#edAtt'), [{k:'min',l:'出勤率がこれ以上（0〜1）',t:'number',w:170},{k:'coef',l:'係数',t:'number',w:100}], JSON.parse(JSON.stringify(br.attendance_coef||[])));
+
+  $('#mwSave').onclick=()=>saveSetting('min_wage',{...mw, pref:$('#mwPref').value, amount:Number($('#mwAmt').value), effective:$('#mwEff').value, prev: (Number($('#mwAmt').value)!==mw.amount? mw.amount : mw.prev)});
+  $('#rrSave').onclick=()=>{
+    const its=items.get().map((x,i)=>({key: x.key || ('item'+(i+1)+'_'+Math.random().toString(36).slice(2,6)), label:x.label})).filter(x=>x.label);
+    saveSetting('review_rules',{...rr, alert_days:Number($('#rrAlert').value), mukitenkan_years:Number($('#rrMk').value), attendance_guide:{late_max:Number($('#rrLate').value), absence_max:Number($('#rrAbs').value)}, items:its, raise_table:raise.get(), raise_table_monthly:raiseM.get()});
+  };
+  $('#grSave').onclick=()=>saveSetting('wage_grades', grades.get());
+  $('#brSave').onclick=()=>{
+    const base={}; EMP_TYPES.forEach(t=>base[t]={kind:$(`[data-bk="${t}"]`).value, value:Number($(`[data-bv="${t}"]`).value)});
+    saveSetting('bonus_rules',{...br, eligibility:$('#brElig').value, periods:periods.get(), base, eval_coef:evalC.get(), attendance_coef:attC.get()});
+  };
+  $('#coSave').onclick=()=>saveSetting('company',{...co, name:$('#coName').value, address:$('#coAddr').value, representative:$('#coRep').value, contact_dept:$('#coDept').value, contact_name:$('#coCName').value, contact_tel:$('#coTel').value, closing_day:Number($('#coClose').value), pay_day:Number($('#coPay').value), locations:$('#coLocs').value.split('\n').map(s=>s.trim()).filter(Boolean), departments:$('#coDeps').value.split('\n').map(s=>s.trim()).filter(Boolean)});
+  $('#stPolicy').onclick=printPolicy;
+  bindContractText();
+}
+function tableEditor(box, cols, rows){
+  const draw=()=>{
+    box.innerHTML=`<table class="t"><thead><tr>${cols.map(c=>`<th>${esc(c.l)}</th>`).join('')}<th></th></tr></thead><tbody>${rows.map((r,i)=>`<tr>${cols.map(c=>`<td><input type="${c.t||'text'}" step="any" value="${esc(r[c.k]??'')}" data-r="${i}" data-k="${c.k}" style="width:${c.w||120}px"></td>`).join('')}<td><button class="btn sm danger" data-del="${i}">削除</button></td></tr>`).join('')}</tbody></table><button class="btn sm" data-add="1" style="margin-top:6px">行を追加</button>`;
+    $$('[data-r]',box).forEach(inp=>inp.oninput=()=>{ const c=cols.find(x=>x.k===inp.dataset.k); rows[inp.dataset.r][inp.dataset.k]= c.t==='number'? (inp.value===''?null:Number(inp.value)) : inp.value; });
+    $$('[data-del]',box).forEach(b=>b.onclick=()=>{ rows.splice(b.dataset.del,1); draw(); });
+    $('[data-add]',box).onclick=()=>{ rows.push({}); draw(); };
+  };
+  draw();
+  return { get:()=>rows.filter(r=>cols.some(c=>r[c.k]!=null && r[c.k]!=='')) };
+}
+async function saveSetting(key, value){
+  const r=await sb.from('hr_settings').upsert({key, value, note:S.settings[key]?.note||null}).select().single();
+  if(r.error){ alert('保存に失敗しました：'+r.error.message); return; }
+  S.settings[key]=r.data; S.statsRange=null; toast('保存しました'); renderSettings();
+}
+function printPolicy(){
+  const mw=setting('min_wage',{}); const rr=setting('review_rules',{}); const gr=setting('wage_grades',[]); const br=setting('bonus_rules',{}); const co=setting('company',{});
+  const tbl=(head,rows)=>`<table><thead><tr>${head.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  $('#printArea').innerHTML=`<div class="policy doc-page">
+  <h1>雇用契約・賃金見直しの運用基準</h1>
+  <div style="text-align:right">${esc(co.name||'')}　制定：${warekiText(todayStr())}</div>
+  <h2>1. 適用範囲</h2>
+  <p>本基準は、正社員・契約社員・パートタイム・アルバイトのすべての従業員の雇用契約の締結・更新、賃金の見直し、賞与・寸志の支給に適用する。就業規則・非正規職員規程と異なる場合は、それらの定めを優先する。</p>
+  <h2>2. 雇用契約の締結と更新</h2>
+  <ol>
+    <li>雇用契約書（労働条件通知書）は、契約の開始日までに2部作成し、双方が署名のうえ1部ずつ保管する。署名済みの原本は電子化して雇用契約管理システムに保管する。</li>
+    <li>有期契約の満了${esc(rr.alert_days??60)}日前に、管理システムのアラートで対象者を確認し、面談を行う。</li>
+    <li>更新の可否は、契約書に記載の「雇用契約更新の要件」により判断する。更新しない場合は、満了の30日前までに本人へ通知する（契約が3回以上更新されている者、または通算1年を超えて継続勤務している者は必須）。</li>
+    <li>条件の変更がない更新であっても、契約の都度、新しい契約書を作成し、履歴を記録する。</li>
+    <li>有期契約の通算期間が${esc(rr.mukitenkan_years??5)}年を超える者には、無期転換を申し込めることを契約書で明示し、対応方針（無期転換後の労働条件を含む）を事前に決めておく。</li>
+    <li>雇用契約書その他の労働関係の重要書類は、退職後5年間（当分の間は3年間）保存する。</li>
+  </ol>
+  <h2>3. 賃金の見直し</h2>
+  <ol>
+    <li>見直しの時期：契約更新時、および毎年10月の最低賃金改定時。正社員は年1回（${esc(rr.annual_review_month??9)}月）に行う。</li>
+    <li>最低賃金：${esc(mw.pref||'')} ${yen(mw.amount)}円（${fmtD(mw.effective)}発効）。改定時は全員の時給換算額を確認し、下回る者は発効日から改定する。</li>
+    <li>評価：次の項目をそれぞれ5段階で評価し、平均点で昇給額の目安を決める。勤怠（遅刻・欠勤）は勤怠システムの記録を用いる。目安：期間内の遅刻${esc(rr.attendance_guide?.late_max??'-')}回以内、欠勤${esc(rr.attendance_guide?.absence_max??'-')}日以内。</li>
+  </ol>
+  ${tbl(['評価項目'], (rr.items||[]).map(i=>[i.label]))}
+  ${tbl(['評価平均','時給の昇給額','ランク'], [...(rr.raise_table||[])].sort((a,b)=>b.min-a.min).map(r=>[`${r.min}以上`, `${yen(r.raise)}円`, r.label||'']))}
+  ${tbl(['評価平均','月給の昇給額'], [...(rr.raise_table_monthly||[])].sort((a,b)=>b.min-a.min).map(r=>[`${r.min}以上`, `${yen(r.raise)}円`]))}
+  <p>時給レンジ（パート・アルバイト）。レンジの上限を超える場合は、役割・等級の見直しとあわせて判断する。</p>
+  ${tbl(['等級','役割・要件','時給の範囲'], gr.map(g=>[g.grade, g.label, `${yen(g.min)}円〜${yen(g.max)}円`]))}
+  <p>決定した内容は、理由とともに記録し、本人に面談で説明する。昇給を見送る場合も、期待する点を具体的に伝える。</p>
+  <h2>4. 賞与・寸志</h2>
+  <p>支給対象：${esc(br.eligibility||'')}。会社の業績により、支給しないこと、または支給額を変更することがある。</p>
+  ${tbl(['期','算定期間','支給月'], (br.periods||[]).map(p=>[p.label,p.calc,p.pay]))}
+  ${tbl(['雇用形態','基準額'], EMP_TYPES.map(t=>{const b=(br.base||{})[t]; return [t, b? (b.kind==='months'? `月額の${b.value}か月分`:`${yen(b.value)}円`):'-'];}))}
+  <p>支給額 ＝ 基準額 × 評価係数 × 出勤率係数（1,000円未満切り捨て）</p>
+  ${tbl(['評価平均','評価係数'], [...(br.eval_coef||[])].sort((a,b)=>b.min-a.min).map(r=>[`${r.min}以上`, r.coef]))}
+  ${tbl(['出勤率','出勤率係数'], [...(br.attendance_coef||[])].sort((a,b)=>b.min-a.min).map(r=>[`${Math.round(r.min*100)}%以上`, r.coef]))}
+  <h2>5. 同一労働同一賃金</h2>
+  <p>正社員と同じ業務・責任を担うパート・有期契約者に対しては、基本給・賞与・手当について不合理な差を設けない。差がある場合は、職務内容・責任の範囲・配置変更の範囲の違いによりその理由を説明できるようにしておく。</p>
+  </div>`;
+  setTimeout(()=>window.print(),50);
+}
+
+// ===== Excel出力 =====
+function exportExcel(){
+  const wb=XLSX.utils.book_new();
+  const t=todayStr();
+  const cur=activeStaff().map(e=>{ const c=currentContract(e.id); const a=alertsFor(e); return {
+    'No.':e.code,'氏名':e.name,'雇用形態':c?.employment_type||'','入社日':e.hire_date||'','勤続':tenureLabel(e.hire_date||firstStart(e)),
+    '契約回数':c?.seq||'','契約開始':c?.start_date||'','契約終了':c?.end_date||'','残日数':c?.end_date? daysBetween(t,c.end_date):'',
+    '賃金形態':c?.wage_type||'','基本給':c?.base_wage??'','時給換算':c&&hourlyEquivalent(c)!=null? Math.floor(hourlyEquivalent(c)):'',
+    '部署':(c?.departments||[]).join('・'),'就業場所':(c?.work_locations||[]).join('・'),'週所定時間':c?.weekly_hours??'',
+    '社会保険':c?.social_insurance?'加入':'','雇用保険':c?.employment_insurance?'加入':'','状態':c?.status||'未登録','注意事項':a.map(x=>x.msg).join(' / ') }; });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(cur), '現況');
+  const hist=[...S.contracts].sort((a,b)=>empName(a.employee_id).localeCompare(empName(b.employee_id),'ja')||a.seq-b.seq).map(c=>({
+    '氏名':empName(c.employee_id),'回':c.seq,'区分':c.change_type,'雇用形態':c.employment_type,'開始':c.start_date,'終了':c.end_date||'定めなし',
+    '賃金形態':c.wage_type,'基本給':c.base_wage,'状態':c.status,'締結日':c.signed_date||'','原本保管':c.file_path?'済':'','理由':c.reason||'','メモ':c.note||''}));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(hist), '契約履歴');
+  const rv=[...S.reviews].sort((a,b)=>b.review_date.localeCompare(a.review_date)).map(r=>({
+    '氏名':empName(r.employee_id),'検討日':r.review_date,'対象期間':`${r.period_from||''}〜${r.period_to||''}`,'評価平均':r.score_avg,
+    '現賃金':r.current_wage,'目安昇給':r.suggested_raise,'提案額':r.proposed_wage,'決定額':r.decided_wage,'結果':r.decision,'適用日':r.effective_date||'','承認者':r.approver||'','理由':r.reason||''}));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rv.length?rv:[{'氏名':''}]), '昇給検討');
+  const bn=[...S.bonuses].map(b=>({'期':b.period_label,'氏名':empName(b.employee_id),'基準額':b.base_amount,'評価係数':b.eval_coef,'出勤率':b.attendance_rate,'出勤係数':b.attendance_coef,'支給額':b.amount,'支給日':b.pay_date||'','状態':b.status}));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(bn.length?bn:[{'期':''}]), '賞与');
+  XLSX.writeFile(wb, `雇用契約台帳_${t.replace(/-/g,'')}.xlsx`);
+}
+
+// ===== 起動 =====
+async function start(){
+  $('#todayLabel').textContent=warekiText(todayStr()).replace(/ /g,'');
+  const { data:{ session } } = await sb.auth.getSession();
+  if(!session){ $('#login').classList.remove('hidden'); return; }
+  const adm=await sb.rpc('hr_is_admin');
+  if(adm.error || !adm.data){
+    $('#login').classList.remove('hidden');
+    $('#lgMsg').textContent='このアカウントには雇用契約管理の権限がありません（管理者のみ）。';
+    return;
+  }
+  S.me=session.user;
+  $('#whoLabel').textContent=session.user.email;
+  try{ await loadAll(); }catch(err){ alert('データの読み込みに失敗しました：'+err.message); return; }
+  $('#login').classList.add('hidden'); $('#app').classList.remove('hidden');
+  render();
+}
+$('#lgBtn').onclick=async()=>{
+  $('#lgMsg').textContent='';
+  const { error } = await sb.auth.signInWithPassword({ email:$('#lgEmail').value.trim(), password:$('#lgPass').value });
+  if(error){ $('#lgMsg').textContent='ログインできませんでした：'+error.message; return; }
+  start();
+};
+$('#lgPass').addEventListener('keydown',ev=>{ if(ev.key==='Enter') $('#lgBtn').click(); });
+$('#btnLogout').onclick=async()=>{ await sb.auth.signOut(); location.reload(); };
+$('#btnPass').onclick=()=>{
+  const m=openModal(`<h2>パスワード変更</h2>
+    <p class="small muted">勤怠システムの管理画面と共通のパスワードです。8文字以上で設定してください。</p>
+    <div class="grid" style="max-width:360px">
+      <label class="f"><span>新しいパスワード</span><input type="password" id="pw1" autocomplete="new-password"></label>
+      <label class="f"><span>新しいパスワード（確認）</span><input type="password" id="pw2" autocomplete="new-password"></label>
+      <div id="pwMsg" class="warn"></div>
+    </div>
+    <div class="foot"><button class="btn" id="pwCancel">キャンセル</button><button class="btn pri" id="pwSave">変更する</button></div>`);
+  $('#pwCancel',m).onclick=closeModal;
+  $('#pwSave',m).onclick=async()=>{
+    const a=$('#pw1',m).value, b=$('#pw2',m).value;
+    if(a.length<8){ $('#pwMsg',m).textContent='8文字以上にしてください'; return; }
+    if(a!==b){ $('#pwMsg',m).textContent='確認用と一致しません'; return; }
+    const { error } = await sb.auth.updateUser({ password:a });
+    if(error){ $('#pwMsg',m).textContent='変更できませんでした：'+error.message; return; }
+    closeModal(); toast('パスワードを変更しました');
+  };
+};
+$('#btnExport').onclick=exportExcel;
+$$('#tabs button').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
+document.addEventListener('keydown',ev=>{ if(ev.key==='Escape' && $('#modalRoot').innerHTML) closeModal(); });
+start();
+</script>
+</body>
+</html>

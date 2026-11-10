@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<title>雇用契約書の確認と署名 | THE HERBS</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="contract-render.js"></script>
+<style>
+:root{--bg:#f4f3ee;--ink:#22281f;--sub:#626b5d;--line:#d9dbd2;--accent:#3f6b45;--accent-soft:#e7efe6;--red:#b3261e;--red-soft:#fbe9e7}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",Meiryo,sans-serif;font-size:15px;line-height:1.7}
+.wrap{max-width:860px;margin:0 auto;padding:16px}
+header{padding:14px 16px;background:#fff;border-bottom:1px solid var(--line)}
+header .brand{font-weight:700;letter-spacing:.06em}
+header .ttl{font-size:13px;color:var(--sub)}
+.card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:18px;margin:16px 0}
+.card h2{font-size:17px;margin:0 0 8px}
+.muted{color:var(--sub)} .small{font-size:13px}
+.btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:10px 16px;cursor:pointer;font:inherit;color:inherit}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.btn:disabled{opacity:.45;cursor:default}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.agree label{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid #eee;cursor:pointer}
+.agree input[type=checkbox]{width:22px;height:22px;flex:none;margin-top:2px;accent-color:var(--accent)}
+label.f{display:block;margin:12px 0}
+label.f span{display:block;font-size:13px;font-weight:600;color:var(--sub);margin-bottom:4px}
+input[type=text]{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font:inherit;background:#fff}
+.sigpad{border:1px dashed #9aa394;border-radius:8px;background:#fff;touch-action:none;width:100%;height:170px;display:block}
+.alert{padding:12px 14px;border-radius:8px;margin:12px 0}
+.alert.red{background:var(--red-soft);color:var(--red)}
+.alert.green{background:var(--accent-soft);color:var(--accent)}
+.docbox{margin-top:8px}
+.center{text-align:center}
+.steps{display:flex;gap:6px;flex-wrap:wrap;font-size:13px;color:var(--sub)}
+.steps b{color:var(--ink)}
+footer{color:var(--sub);font-size:12px;text-align:center;padding:24px 16px 40px}
+#printArea{display:none}
+@media print{
+  @page{size:A4;margin:10mm 12mm}
+  body{background:#fff}
+  body > *:not(#printArea){display:none !important}
+  #printArea{display:block !important}
+}
+@media screen and (min-width:761px){ .docbox{background:#e9e8e2;padding:16px;border-radius:10px;overflow:auto} .docbox .doc-page{padding:12mm;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.12)} }
+</style>
+</head>
+<body>
+<header><div class="brand" id="hBrand">THE HERBS</div><div class="ttl">雇用契約書の確認と署名</div></header>
+<div class="wrap" id="main"><div class="card"><p class="muted">読み込んでいます…</p></div></div>
+<footer id="foot"></footer>
+<div id="printArea"></div>
+<script>
+'use strict';
+const SUPABASE_URL='https://bngafucbmdnehzqmsles.supabase.co';
+const SUPABASE_KEY='sb_publishable_Zd5lDU_gxbWzBAqnwo-_2g_wmisbRyk';
+const sb=window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {auth:{persistSession:false, autoRefreshToken:false}});
+const CR=window.ContractRender; CR.injectStyles();
+const $=(s,el=document)=>el.querySelector(s);
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const token=new URLSearchParams(location.search).get('t')||'';
+let D=null;
+
+function fmtJ(s){ if(!s) return ''; const d=new Date(s); const j=new Date(d.getTime()+9*3600000); return `${j.getUTCFullYear()}年${j.getUTCMonth()+1}月${j.getUTCDate()}日`; }
+function errorView(code){
+  const msg={not_found:'このリンクは見つかりませんでした。メールに記載されたリンクをもう一度お確かめください。',
+    revoked:'このリンクは取り消されています。新しいリンクが届いている場合は、そちらからお進みください。',
+    expired:'署名の期限が過ぎています。お手数ですが、会社までご連絡ください。新しいリンクをお送りします。'}[code] || '読み込みに失敗しました。通信環境の良い場所でもう一度お試しください。';
+  $('#main').innerHTML=`<div class="card"><h2>この契約書を開けません</h2><p>${esc(msg)}</p></div>`;
+}
+function signedOpts(){
+  return { mobile: innerWidth<761, signed:{name:D.signer_name, address:D.signer_address, signature:D.signature, signed_at:D.signed_at},
+    audit:{ created_at:D.created_at, hash:D.hash, agreements_labels: CR.AGREEMENTS.filter(a=>D.agreements&&D.agreements[a.key]).map(a=>a.label) } };
+}
+async function load(){
+  if(!/^[0-9a-f-]{36}$/i.test(token)){ errorView('not_found'); return; }
+  const {data,error}=await sb.rpc('sign_get',{p_token:token});
+  if(error){ errorView('network'); return; }
+  if(data.error){ errorView(data.error); return; }
+  D=data;
+  const co=D.snapshot.company||{};
+  $('#hBrand').textContent=co.name||'THE HERBS';
+  $('#foot').innerHTML=`${esc(co.name||'')}　${esc(co.address||'')}<br>お問い合わせ：${esc(co.contact_name||'')}（${esc(co.contact_tel||'')}）`;
+  if(D.status==='署名済') doneView(); else signView();
+}
+function signView(){
+  const s=D.snapshot, c=s.contract, e=s.employee;
+  const period=c.end_date?`${fmtJ(c.start_date)} 〜 ${fmtJ(c.end_date)}`:`${fmtJ(c.start_date)} から（期間の定めなし）`;
+  $('#main').innerHTML=`
+  <div class="card">
+    <h2>${esc(e.name)} さん</h2>
+    <p>雇用契約書をお送りします。内容をお読みいただき、いちばん下で同意と署名をお願いします。</p>
+    <p class="small muted">契約期間：${esc(period)}<br>署名の期限：${esc(fmtJ(D.expires_at))}</p>
+    <div class="steps"><b>1. 内容を読む</b>→<span>2. 項目ごとに同意</span>→<span>3. 署名して送信</span></div>
+    <div class="row" style="margin-top:10px"><button class="btn" id="bPrint">印刷用のレイアウトで見る・印刷する</button></div>
+  </div>
+  <div class="docbox">${CR.render(s,{mobile:innerWidth<761})}</div>
+  <div class="card" id="signCard">
+    <h2>同意と署名</h2>
+    <div class="agree">${CR.AGREEMENTS.map(a=>`<label><input type="checkbox" data-ag="${a.key}"><span>${esc(a.label)}</span></label>`).join('')}</div>
+    <label class="f"><span>氏名（フルネーム）</span><input type="text" id="iName" autocomplete="name" placeholder="${esc(e.name)}"></label>
+    <label class="f"><span>住所（入社誓約書に記載されます）</span><input type="text" id="iAddr" autocomplete="street-address"></label>
+    <div class="f"><span class="small" style="font-weight:600;color:var(--sub)">署名（枠の中に指またはマウスで書いてください）</span>
+      <canvas class="sigpad" id="pad"></canvas>
+      <div class="row" style="justify-content:flex-end;margin-top:6px"><button class="btn" id="bClear" type="button">書き直す</button></div></div>
+    <div id="msg"></div>
+    <button class="btn pri" id="bSubmit" style="width:100%;margin-top:8px" disabled>署名して送信する</button>
+    <p class="small muted" style="margin-bottom:0">送信すると、この内容で契約が成立したものとして会社に記録されます。送信後に控えをPDFで保存できます。わからない点があれば、送信する前に会社へご相談ください。</p>
+  </div>`;
+  $('#bPrint').onclick=()=>{ $('#printArea').innerHTML=CR.render(s,{fixed:true}); setTimeout(()=>print(),50); };
+  const pad=setupPad($('#pad'));
+  const check=()=>{
+    const allAg=[...document.querySelectorAll('[data-ag]')].every(x=>x.checked);
+    $('#bSubmit').disabled=!(allAg && $('#iName').value.trim() && $('#iAddr').value.trim() && pad.hasInk());
+  };
+  document.querySelectorAll('[data-ag]').forEach(x=>x.onchange=check);
+  $('#iName').oninput=check; $('#iAddr').oninput=check; pad.onchange=check;
+  $('#bClear').onclick=()=>{ pad.clear(); check(); };
+  $('#bSubmit').onclick=async()=>{
+    const name=$('#iName').value.trim();
+    const norm=x=>x.replace(/[\s　]/g,'');
+    if(norm(name)!==norm(e.name) && !confirm(`入力された氏名「${name}」が、契約書の氏名「${e.name}」と異なります。このまま送信しますか？`)) return;
+    if(!confirm('この内容で署名して送信します。よろしいですか？')) return;
+    const ag={}; document.querySelectorAll('[data-ag]').forEach(x=>ag[x.dataset.ag]=x.checked); ag.at=new Date().toISOString();
+    $('#bSubmit').disabled=true; $('#bSubmit').textContent='送信しています…';
+    const {data,error}=await sb.rpc('sign_submit',{p_token:token, p_name:name, p_address:$('#iAddr').value.trim(), p_signature:pad.toDataURL(), p_agreements:ag, p_ua:navigator.userAgent});
+    if(error || data.error){
+      const m={expired:'署名の期限が過ぎています。会社までご連絡ください。',revoked:'このリンクは取り消されています。',already_signed:'この契約書はすでに署名済みです。',missing:'氏名と住所を入力してください。',bad_signature:'署名をもう一度書いてください。'}[data&&data.error]||'送信できませんでした。通信環境の良い場所でもう一度お試しください。';
+      $('#msg').innerHTML=`<div class="alert red">${esc(m)}</div>`; $('#bSubmit').disabled=false; $('#bSubmit').textContent='署名して送信する'; return;
+    }
+    const r2=await sb.rpc('sign_get',{p_token:token}); if(!r2.error && !r2.data.error) D=r2.data;
+    doneView(true); scrollTo(0,0);
+  };
+}
+function doneView(justNow){
+  const s=D.snapshot;
+  $('#main').innerHTML=`
+  <div class="card">
+    <div class="alert green" style="margin-top:0"><b>${justNow?'署名を受け付けました。ありがとうございました。':'この契約書は署名済みです。'}</b><br>署名日時：${esc(CR.jstDateTime(D.signed_at))}</div>
+    <p>控えとして、下のボタンからPDFを保存しておいてください。</p>
+    <div class="row"><button class="btn pri" id="bPdf">控えをPDFで保存</button><button class="btn" id="bPrint">印刷する</button></div>
+  </div>
+  <div class="docbox">${CR.render(s, signedOpts())}</div>`;
+  $('#bPrint').onclick=()=>{ const o=signedOpts(); o.mobile=false; o.fixed=true; $('#printArea').innerHTML=CR.render(s,o); setTimeout(()=>print(),50); };
+  $('#bPdf').onclick=async()=>{
+    const b=$('#bPdf'); b.disabled=true; b.textContent='作成しています…';
+    try{
+      const o=signedOpts(); o.mobile=false; o.fixed=true;
+      const pdf=await CR.toPdf(CR.render(s,o));
+      pdf.save(`雇用契約書_${s.employee.name.replace(/[\s　]/g,'')}.pdf`);
+    }catch(err){ alert('PDFを作成できませんでした。「印刷する」から「PDFとして保存」を選んでください。'); }
+    b.disabled=false; b.textContent='控えをPDFで保存';
+  };
+}
+function setupPad(cv){
+  const ctx=cv.getContext('2d'); let drawing=false, ink=false, last=null;
+  const api={ onchange:null, hasInk:()=>ink, clear(){ resize(true); ink=false; }, toDataURL(){ return trimmed(); } };
+  function resize(clear){
+    const r=cv.getBoundingClientRect(); const dpr=Math.min(window.devicePixelRatio||1,2);
+    const keep = !clear && ink ? cv.toDataURL() : null;
+    cv.width=Math.round(r.width*dpr); cv.height=Math.round(r.height*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0); ctx.fillStyle='#fff'; ctx.fillRect(0,0,r.width,r.height);
+    ctx.lineWidth=2.4; ctx.lineCap='round'; ctx.lineJoin='round'; ctx.strokeStyle='#111';
+    if(keep){ const img=new Image(); img.onload=()=>ctx.drawImage(img,0,0,r.width,r.height); img.src=keep; }
+  }
+  function pos(ev){ const r=cv.getBoundingClientRect(); return {x:ev.clientX-r.left, y:ev.clientY-r.top}; }
+  cv.addEventListener('pointerdown',ev=>{ drawing=true; last=pos(ev); cv.setPointerCapture(ev.pointerId); ev.preventDefault(); });
+  cv.addEventListener('pointermove',ev=>{ if(!drawing) return; const p=pos(ev); ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke(); last=p; if(!ink){ ink=true; api.onchange&&api.onchange(); } ev.preventDefault(); });
+  const end=()=>{ drawing=false; };
+  cv.addEventListener('pointerup',end); cv.addEventListener('pointercancel',end);
+  function trimmed(){
+    const w=cv.width,h=cv.height; const d=ctx.getImageData(0,0,w,h).data; let x0=w,y0=h,x1=0,y1=0;
+    for(let y=0;y<h;y+=2) for(let x=0;x<w;x+=2){ const i=(y*w+x)*4; if(d[i]<200){ if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; } }
+    if(x1<=x0) return cv.toDataURL('image/png');
+    const m=12; x0=Math.max(0,x0-m); y0=Math.max(0,y0-m); x1=Math.min(w,x1+m); y1=Math.min(h,y1+m);
+    const o=document.createElement('canvas'); o.width=x1-x0; o.height=y1-y0; o.getContext('2d').drawImage(cv,x0,y0,o.width,o.height,0,0,o.width,o.height);
+    return o.toDataURL('image/png');
+  }
+  resize(true);
+  let rt; window.addEventListener('resize',()=>{ clearTimeout(rt); rt=setTimeout(()=>resize(false),150); });
+  return api;
+}
+load();
+</script>
+</body>
+</html>
