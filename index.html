@@ -359,6 +359,7 @@ function renderStaff(){
       <label class="f" style="width:160px"><span>雇用形態</span><select id="sfType"><option value="">すべて</option>${EMP_TYPES.map(x=>`<option ${x===staffFilter.type?'selected':''}>${x}</option>`).join('')}</select></label>
       <label class="checks"><input type="checkbox" id="sfInactive" ${staffFilter.showInactive?'checked':''}> 退職者も表示</label>
       <span style="flex:1"></span>
+      <button class="btn" id="sfRetiree">退職者を追加</button>
       <button class="btn pri" id="sfImport">過去の契約書をまとめて登録</button>
     </div>
     <div class="scroll">
@@ -384,6 +385,7 @@ function renderStaff(){
   $('#sfType').onchange=ev=>{staffFilter.type=ev.target.value; renderStaff();};
   $('#sfInactive').onchange=ev=>{staffFilter.showInactive=ev.target.checked; renderStaff();};
   $('#sfImport').onclick=()=>openImport();
+  $('#sfRetiree').onclick=async()=>{ const e=await addRetiree(); if(e){ staffFilter.showInactive=true; renderStaff(); } };
   $$('#tab-staff tr[data-emp]').forEach(tr=>tr.onclick=()=>openEmployee(tr.dataset.emp));
 }
 
@@ -1047,6 +1049,22 @@ function guessYYMM(name){
   return '';
 }
 
+// ===== 退職者の追加（勤怠の打刻画面には出ない：active=false） =====
+async function addRetiree(){
+  const name=(prompt('退職者の氏名を入力してください（例：山田 花子）')||'').trim();
+  if(!name) return null;
+  const flat=name.replace(/[\s　]/g,'');
+  const dup=S.employees.find(e=>e.name.replace(/[\s　]/g,'')===flat);
+  if(dup){ alert(`「${dup.name}」はすでに登録されています。`); return dup; }
+  const hire=(prompt('入社日がわかれば入力してください（例：2023-04-11）。わからなければ空欄のままOK')||'').trim();
+  const maxCode=Math.max(100, ...S.employees.filter(e=>e.code>=100 && e.code<999 && e.role!=='admin').map(e=>e.code));
+  const payload={ code:maxCode+1, name, active:false, role:'staff', sort_order:maxCode+1, note:'退職者（雇用契約管理の記録用）' };
+  if(/^\d{4}-\d{2}-\d{2}$/.test(hire)) payload.hire_date=hire;
+  const r=await sb.from('employees').insert(payload).select('id,code,name,hire_date,active,role,title,location_id,schedule,week_days,sort_order,email').single();
+  if(r.error){ alert('追加できませんでした：'+r.error.message); return null; }
+  S.employees.push(r.data); toast(`${name}さんを退職者として追加しました`); return r.data;
+}
+
 // ===== 過去の契約書をまとめて登録 =====
 function guessFromFilename(name){
   const flat=name.replace(/[\s　_\-]/g,'');
@@ -1076,7 +1094,7 @@ function openImport(presetEmpId){
     $('#imRows',m).innerHTML= rows.length? `<div class="scroll"><table class="t"><thead><tr><th>ファイル</th><th>従業員</th><th>開始日</th><th>終了日</th><th>雇用形態</th><th>賃金</th><th>メモ</th><th></th></tr></thead><tbody>
     ${rows.map((r,i)=>`<tr>
       <td style="max-width:200px"><div class="small" style="word-break:break-all">${esc(r.file.name)}</div><button class="btn sm" data-iv="${i}">開く</button>${r.info?`<div class="small" style="margin-top:3px;color:${r.infoOk?'var(--accent)':'var(--amber)'}">${esc(r.info)}</div>`:''}</td>
-      <td><select data-i="${i}" data-k="employee_id" style="width:140px"><option value="">選択</option>${emps.map(e=>`<option value="${e.id}" ${r.employee_id===e.id?'selected':''}>${esc(e.name)}${e.active?'':'（退職）'}</option>`).join('')}</select></td>
+      <td><select data-i="${i}" data-k="employee_id" style="width:140px"><option value="">選択</option>${emps.map(e=>`<option value="${e.id}" ${r.employee_id===e.id?'selected':''}>${esc(e.name)}${e.active?'':'（退職）'}</option>`).join('')}<option value="__new">＋ 退職者を追加…</option></select></td>
       <td><input type="date" data-i="${i}" data-k="start_date" value="${esc(r.start_date)}"></td>
       <td><input type="date" data-i="${i}" data-k="end_date" value="${esc(r.end_date)}"></td>
       <td><select data-i="${i}" data-k="employment_type" style="width:110px">${EMP_TYPES.map(x=>`<option ${x===r.employment_type?'selected':''}>${x}</option>`).join('')}</select></td>
@@ -1084,6 +1102,7 @@ function openImport(presetEmpId){
       <td><input type="text" data-i="${i}" data-k="note" value="${esc(r.note||'')}" style="width:130px"></td>
       <td><button class="btn sm danger" data-ix="${i}">外す</button></td></tr>`).join('')}</tbody></table></div>` : '';
     $$('[data-i]',m).forEach(inp=>{ const h=()=>{ const r=rows[inp.dataset.i]; const k=inp.dataset.k; r[k]= k==='base_wage' ? (inp.value===''?null:Number(inp.value)) : inp.value;
+      if(k==='employee_id' && r.employee_id==='__new'){ r.employee_id=''; addRetiree().then(e=>{ if(e){ emps.push(e); r.employee_id=e.id; } draw(); check(); }); return; }
       if(k==='employee_id'){ const c=currentContract(r.employee_id); if(c){ r.employment_type=c.employment_type; r.wage_type=c.wage_type; draw(); } } check(); };
       inp.oninput=h; inp.onchange=h; });
     $$('[data-ix]',m).forEach(b=>b.onclick=()=>{ rows.splice(b.dataset.ix,1); draw(); check(); });
