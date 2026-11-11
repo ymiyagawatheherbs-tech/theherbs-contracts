@@ -8,6 +8,8 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
 <script src="contract-render.js"></script>
 <style>
 :root{
@@ -989,6 +991,62 @@ function bindContractText(){
   };
 }
 
+// ===== 契約書の中身から読み取る（文字が埋め込まれたPDF・Word .docx） =====
+async function fileText(file){
+  const name=file.name.toLowerCase();
+  if(name.endsWith('.pdf')){
+    const lib=window.pdfjsLib; if(!lib) return {text:'', why:'PDF読み取り機能を読み込めませんでした'};
+    lib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+    const pdf=await lib.getDocument({data:await file.arrayBuffer()}).promise;
+    let text='';
+    for(let p=1;p<=Math.min(pdf.numPages,4);p++){ const pg=await pdf.getPage(p); const tc=await pg.getTextContent(); text+=tc.items.map(i=>i.str).join(' ')+'\n'; }
+    return {text, why: text.replace(/\s/g,'').length<20 ? 'スキャン画像のPDFのため文字を読み取れません' : ''};
+  }
+  if(name.endsWith('.docx')){
+    if(!window.mammoth) return {text:'', why:'Word読み取り機能を読み込めませんでした'};
+    const r=await window.mammoth.extractRawText({arrayBuffer:await file.arrayBuffer()});
+    return {text:r.value, why:''};
+  }
+  if(name.endsWith('.doc')) return {text:'', why:'古いWord形式（.doc）は読み取れません。Wordで開き「PDFとして保存」してから選んでください'};
+  return {text:'', why:'画像のため文字を読み取れません'};
+}
+function zen2han(s){ return s.replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/[，]/g,',').replace(/[～〜]/g,'~'); }
+function parseContractText(raw){
+  const t=zen2han(raw).replace(/[\s　]+/g,'');
+  const out={};
+  const era=(y)=> y==='元'?2019:2018+Number(y);
+  const D=(y,m,d)=>`${y}-${pad(+m)}-${pad(+d)}`;
+  // 契約期間（令和／西暦）
+  let m=t.match(/令和(\d+|元)年(\d{1,2})月(\d{1,2})日[~ー－\-から至]+令和(\d+|元)年(\d{1,2})月(\d{1,2})日/);
+  if(m){ out.start=D(era(m[1]),m[2],m[3]); out.end=D(era(m[4]),m[5],m[6]); }
+  if(!out.start){ m=t.match(/(20\d{2})年(\d{1,2})月(\d{1,2})日[~ー－\-から至]+(20\d{2})年(\d{1,2})月(\d{1,2})日/); if(m){ out.start=D(m[1],m[2],m[3]); out.end=D(m[4],m[5],m[6]); } }
+  // 賃金変更承諾書など「○年○月○日より（から）」
+  if(!out.start){ m=t.match(/令和(\d+|元)年(\d{1,2})月(\d{1,2})日(?:より|から|付)/) ; if(m) out.start=D(era(m[1]),m[2],m[3]); }
+  if(!out.start){ m=t.match(/契約期間[^令]{0,20}令和(\d+|元)年(\d{1,2})月(\d{1,2})日/); if(m) out.start=D(era(m[1]),m[2],m[3]); }
+  if(/[☑■✓✔]定めなし/.test(t)){ out.end=''; out.fixed=false; }
+  // 雇用形態
+  if(/正社員用|正社員雇用契約|雇用契約書\(正社員/.test(t)) out.etype='正社員';
+  else if(/契約社員/.test(t)) out.etype='契約社員';
+  else if(/アルバイト/.test(t) && !/パート/.test(t)) out.etype='アルバイト';
+  else if(/非正規|パート/.test(t)) out.etype='パートタイム';
+  // 賃金形態（チェックの付いたもの）
+  m=t.match(/[☑■✓✔](日給月給|日給|時給|月給)/); if(m) out.wtype=m[1];
+  // 金額：変更後（「→」「変更後」「改定後」の後）を優先、なければ基本給・時給の後の金額
+  const nums=[];
+  let re=/(?:変更後|改定後|新|→|円から|円より)[^\d]{0,12}([\d,]{3,9})円/g; while((m=re.exec(t))) nums.push(+m[1].replace(/,/g,''));
+  if(!nums.length){ re=/(?:基本給|時給|月給|日給|時間給)[^\d円]{0,12}([\d,]{3,9})円/g; while((m=re.exec(t))) nums.push(+m[1].replace(/,/g,'')); }
+  const v=nums.filter(n=>n>=800 && n<=2000000);
+  if(v.length){ out.wage=v[v.length-1]; if(!out.wtype) out.wtype= out.wage>=100000 ? '月給' : '時給'; }
+  if(/賃金変更承諾|変更承諾書|賃金変更通知|賃金改定通知/.test(t)) out.kind='賃金変更承諾書';
+  return out;
+}
+// ファイル名の先頭の YYMMDD／YYMM（例：240211_…、2402…）
+function guessYYMM(name){
+  let m=name.match(/^(\d{2})(\d{2})(\d{2})(?!\d)/); if(m && +m[2]>=1 && +m[2]<=12 && +m[3]>=1 && +m[3]<=31) return `20${m[1]}-${m[2]}-${m[3]}`;
+  m=name.match(/^(\d{2})(\d{2})(?!\d)/); if(m && +m[2]>=1 && +m[2]<=12) return `20${m[1]}-${m[2]}-11`;
+  return '';
+}
+
 // ===== 過去の契約書をまとめて登録 =====
 function guessFromFilename(name){
   const flat=name.replace(/[\s　_\-]/g,'');
@@ -998,6 +1056,7 @@ function guessFromFilename(name){
   while((m=re.exec(name)) && dates.length<2){ const y=+m[1], mo=+m[2], d=+m[3]; if(mo>=1&&mo<=12&&d>=1&&d<=31) dates.push(`${y}-${pad(mo)}-${pad(d)}`); }
   const rw=/(?:R|令和)(\d{1,2})[.\-\/年_](\d{1,2})[.\-\/月_](\d{1,2})/g;
   while(dates.length<2 && (m=rw.exec(name))){ dates.push(`${2018+(+m[1])}-${pad(+m[2])}-${pad(+m[3])}`); }
+  if(!dates.length){ const y=guessYYMM(name); if(y) dates.push(y); }
   return { emp, start:dates[0]||'', end:dates[1]||'' };
 }
 function openImport(presetEmpId){
@@ -1005,10 +1064,10 @@ function openImport(presetEmpId){
   let rows=[];
   const m=openModal(`
     <h2>過去の契約書をまとめて登録</h2>
-    <p class="small muted">スキャンしたPDFや写真をまとめて選ぶと、1ファイル＝1契約として登録できます。ファイル名に氏名や日付（例：2023-07-09）が入っていれば自動で読み取ります。基本給がわからない場合は空欄のままで構いません。</p>
+    <p class="small muted">PDFや写真をまとめて選ぶと、1ファイル＝1契約として登録できます。WordからPDFにした契約書や .docx は、中身から契約期間・雇用形態・賃金を読み取ります。スキャン画像の場合は、ファイル名の氏名と日付（例：240211_氏名、2023-07-09）から読み取ります。読み取れなかった項目は「開く」で中身を見ながら入力してください。</p>
     <label id="imDrop" style="display:block;border:2px dashed var(--line);border-radius:8px;padding:22px;text-align:center;cursor:pointer;background:#fafaf7">
-      ここにファイルをドラッグするか、クリックして選択（PDF・画像、複数可）
-      <input type="file" id="imFiles" multiple accept="application/pdf,image/*" class="hidden">
+      ここにファイルをドラッグするか、クリックして選択（PDF・Word・画像、複数可）
+      <input type="file" id="imFiles" multiple accept="application/pdf,image/*,.docx,.doc" class="hidden">
     </label>
     <div id="imRows" style="margin-top:12px"></div>
     <div id="imMsg" class="small muted" style="margin-top:6px"></div>
@@ -1016,7 +1075,7 @@ function openImport(presetEmpId){
   const draw=()=>{
     $('#imRows',m).innerHTML= rows.length? `<div class="scroll"><table class="t"><thead><tr><th>ファイル</th><th>従業員</th><th>開始日</th><th>終了日</th><th>雇用形態</th><th>賃金</th><th>メモ</th><th></th></tr></thead><tbody>
     ${rows.map((r,i)=>`<tr>
-      <td style="max-width:180px"><div class="small" style="word-break:break-all">${esc(r.file.name)}</div><button class="btn sm" data-iv="${i}">開く</button></td>
+      <td style="max-width:200px"><div class="small" style="word-break:break-all">${esc(r.file.name)}</div><button class="btn sm" data-iv="${i}">開く</button>${r.info?`<div class="small" style="margin-top:3px;color:${r.infoOk?'var(--accent)':'var(--amber)'}">${esc(r.info)}</div>`:''}</td>
       <td><select data-i="${i}" data-k="employee_id" style="width:140px"><option value="">選択</option>${emps.map(e=>`<option value="${e.id}" ${r.employee_id===e.id?'selected':''}>${esc(e.name)}${e.active?'':'（退職）'}</option>`).join('')}</select></td>
       <td><input type="date" data-i="${i}" data-k="start_date" value="${esc(r.start_date)}"></td>
       <td><input type="date" data-i="${i}" data-k="end_date" value="${esc(r.end_date)}"></td>
@@ -1039,8 +1098,24 @@ function openImport(presetEmpId){
     for(const f of files){
       const g=guessFromFilename(f.name); const empId= presetEmpId || g.emp?.id || '';
       const c= empId? currentContract(empId) : null;
-      rows.push({ file:f, url:URL.createObjectURL(f), employee_id:empId, start_date:g.start, end_date:g.end,
-        employment_type:c?.employment_type||'パートタイム', wage_type:c?.wage_type||'時給', base_wage:null, note:'' });
+      const row={ file:f, url:URL.createObjectURL(f), employee_id:empId, start_date:g.start, end_date:g.end,
+        employment_type:c?.employment_type||'パートタイム', wage_type:c?.wage_type||'時給', base_wage:null, note:'', info:'中身を読み取り中…' };
+      rows.push(row);
+      fileText(f).then(({text,why})=>{
+        if(!text || why){ row.info= why || '中身を読み取れませんでした'; row.infoOk=false; }
+        else{
+          const p=parseContractText(text); const got=[];
+          if(p.start){ row.start_date=p.start; got.push('期間'); }
+          if(p.end!==undefined && p.start){ row.end_date=p.end; }
+          if(p.etype){ row.employment_type=p.etype; got.push('雇用形態'); }
+          if(p.wtype){ row.wage_type=p.wtype; }
+          if(p.wage){ row.base_wage=p.wage; got.push('賃金'); }
+          if(p.kind && !row.note) row.note=p.kind;
+          row.info= got.length? `中身から読み取り：${got.join('・')}（確認してください）` : '中身から日付・賃金を見つけられませんでした';
+          row.infoOk=!!got.length;
+        }
+        draw(); check();
+      }).catch(()=>{ row.info='中身を読み取れませんでした'; row.infoOk=false; draw(); });
     }
     draw(); check();
   };
