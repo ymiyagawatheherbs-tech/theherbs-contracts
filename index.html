@@ -172,7 +172,7 @@ const CR = window.ContractRender; CR.injectStyles();
 const PUBLIC_BASE = 'https://ymiyagawatheherbs-tech.github.io/theherbs-contracts/';
 
 const EMP_TYPES = ['正社員','契約社員','パートタイム','アルバイト'];
-const CHANGE_TYPES = ['新規','条件変更なし更新','賃金改定あり更新','条件変更あり更新','雇用形態変更','契約終了'];
+const CHANGE_TYPES = ['新規','条件変更なし更新','賃金改定あり更新','条件変更あり更新','雇用形態変更','契約終了','過去分登録'];
 const STATUSES = ['下書き','締結済','要確認','終了'];
 const WAGE_TYPES = ['時給','日給','日給月給','月給'];
 
@@ -356,6 +356,8 @@ function renderStaff(){
       <label class="f" style="width:200px"><span>氏名で検索</span><input type="text" id="sfQ" value="${esc(staffFilter.q)}"></label>
       <label class="f" style="width:160px"><span>雇用形態</span><select id="sfType"><option value="">すべて</option>${EMP_TYPES.map(x=>`<option ${x===staffFilter.type?'selected':''}>${x}</option>`).join('')}</select></label>
       <label class="checks"><input type="checkbox" id="sfInactive" ${staffFilter.showInactive?'checked':''}> 退職者も表示</label>
+      <span style="flex:1"></span>
+      <button class="btn pri" id="sfImport">過去の契約書をまとめて登録</button>
     </div>
     <div class="scroll">
     <table class="t">
@@ -379,6 +381,7 @@ function renderStaff(){
   $('#sfQ').oninput=ev=>{staffFilter.q=ev.target.value; const pos=ev.target.selectionStart; renderStaff(); const i=$('#sfQ'); i.focus(); i.setSelectionRange(pos,pos);};
   $('#sfType').onchange=ev=>{staffFilter.type=ev.target.value; renderStaff();};
   $('#sfInactive').onchange=ev=>{staffFilter.showInactive=ev.target.checked; renderStaff();};
+  $('#sfImport').onclick=()=>openImport();
   $$('#tab-staff tr[data-emp]').forEach(tr=>tr.onclick=()=>openEmployee(tr.dataset.emp));
 }
 
@@ -424,6 +427,7 @@ function openEmployee(empId){
       <h3 style="margin:0;flex:1">契約履歴</h3>
       <button class="btn pri" id="eRenew">${cur?'更新契約を作成':'契約を新規作成'}</button>
       <button class="btn" id="eReview">昇給検討をする</button>
+      <button class="btn" id="eImport">過去の契約書を追加</button>
     </div>
     <div class="scroll"><table class="t">
       <thead><tr><th>回</th><th>区分</th><th>雇用形態</th><th>期間</th><th class="num">賃金</th><th>状態</th><th>署名済み原本</th><th>理由・メモ</th><th></th></tr></thead>
@@ -451,6 +455,7 @@ function openEmployee(empId){
   `,{wide:true});
   $('#eClose',m).onclick=closeModal;
   $('#eRenew',m).onclick=()=>openContractForm(cur? renewFrom(cur) : newContractFor(e));
+  $('#eImport',m).onclick=()=>openImport(empId);
   $('#eReview',m).onclick=()=>{ closeModal(); reviewState.empId=empId; reviewState.editing=null; showTab('review'); };
   $$('[data-edit]',m).forEach(b=>b.onclick=()=>openContractForm({...S.contracts.find(c=>c.id==b.dataset.edit)}));
   $$('[data-print]',m).forEach(b=>b.onclick=()=>printContract(S.contracts.find(c=>c.id==b.dataset.print)));
@@ -982,6 +987,100 @@ function bindContractText(){
     $('#printArea').innerHTML=CR.render(CR.buildSnapshot({contract:c, employee:emp, company:setting('company',{}), text:collect(), mkYears:5, firstStart:firstStart(emp)}),{fixed:true});
     setTimeout(()=>window.print(),50);
   };
+}
+
+// ===== 過去の契約書をまとめて登録 =====
+function guessFromFilename(name){
+  const flat=name.replace(/[\s　_\-]/g,'');
+  const emp=S.employees.filter(e=>e.role!=='admin').find(e=>flat.includes(e.name.replace(/[\s　]/g,'')))
+    || S.employees.filter(e=>e.role!=='admin').find(e=>{ const fam=e.name.split(/[\s　]/)[0]; return fam.length>=2 && flat.includes(fam) && e.name.match(/[\s　]/); });
+  const dates=[]; const re=/(20\d{2})[.\-\/年_]?(\d{1,2})[.\-\/月_]?(\d{1,2})/g; let m;
+  while((m=re.exec(name)) && dates.length<2){ const y=+m[1], mo=+m[2], d=+m[3]; if(mo>=1&&mo<=12&&d>=1&&d<=31) dates.push(`${y}-${pad(mo)}-${pad(d)}`); }
+  const rw=/(?:R|令和)(\d{1,2})[.\-\/年_](\d{1,2})[.\-\/月_](\d{1,2})/g;
+  while(dates.length<2 && (m=rw.exec(name))){ dates.push(`${2018+(+m[1])}-${pad(+m[2])}-${pad(+m[3])}`); }
+  return { emp, start:dates[0]||'', end:dates[1]||'' };
+}
+function openImport(presetEmpId){
+  const emps=S.employees.filter(e=>e.role!=='admin').sort((a,b)=> (b.active-a.active) || a.code-b.code);
+  let rows=[];
+  const m=openModal(`
+    <h2>過去の契約書をまとめて登録</h2>
+    <p class="small muted">スキャンしたPDFや写真をまとめて選ぶと、1ファイル＝1契約として登録できます。ファイル名に氏名や日付（例：2023-07-09）が入っていれば自動で読み取ります。基本給がわからない場合は空欄のままで構いません。</p>
+    <label id="imDrop" style="display:block;border:2px dashed var(--line);border-radius:8px;padding:22px;text-align:center;cursor:pointer;background:#fafaf7">
+      ここにファイルをドラッグするか、クリックして選択（PDF・画像、複数可）
+      <input type="file" id="imFiles" multiple accept="application/pdf,image/*" class="hidden">
+    </label>
+    <div id="imRows" style="margin-top:12px"></div>
+    <div id="imMsg" class="small muted" style="margin-top:6px"></div>
+    <div class="foot"><button class="btn" id="imCancel">閉じる</button><button class="btn pri" id="imSave" disabled>登録する</button></div>`,{wide:true});
+  const draw=()=>{
+    $('#imRows',m).innerHTML= rows.length? `<div class="scroll"><table class="t"><thead><tr><th>ファイル</th><th>従業員</th><th>開始日</th><th>終了日</th><th>雇用形態</th><th>賃金</th><th>メモ</th><th></th></tr></thead><tbody>
+    ${rows.map((r,i)=>`<tr>
+      <td style="max-width:180px"><div class="small" style="word-break:break-all">${esc(r.file.name)}</div><button class="btn sm" data-iv="${i}">開く</button></td>
+      <td><select data-i="${i}" data-k="employee_id" style="width:140px"><option value="">選択</option>${emps.map(e=>`<option value="${e.id}" ${r.employee_id===e.id?'selected':''}>${esc(e.name)}${e.active?'':'（退職）'}</option>`).join('')}</select></td>
+      <td><input type="date" data-i="${i}" data-k="start_date" value="${esc(r.start_date)}"></td>
+      <td><input type="date" data-i="${i}" data-k="end_date" value="${esc(r.end_date)}"></td>
+      <td><select data-i="${i}" data-k="employment_type" style="width:110px">${EMP_TYPES.map(x=>`<option ${x===r.employment_type?'selected':''}>${x}</option>`).join('')}</select></td>
+      <td style="white-space:nowrap"><select data-i="${i}" data-k="wage_type" style="width:76px">${WAGE_TYPES.map(x=>`<option ${x===r.wage_type?'selected':''}>${x}</option>`).join('')}</select> <input type="number" data-i="${i}" data-k="base_wage" value="${esc(r.base_wage??'')}" placeholder="円" style="width:92px"></td>
+      <td><input type="text" data-i="${i}" data-k="note" value="${esc(r.note||'')}" style="width:130px"></td>
+      <td><button class="btn sm danger" data-ix="${i}">外す</button></td></tr>`).join('')}</tbody></table></div>` : '';
+    $$('[data-i]',m).forEach(inp=>{ const h=()=>{ const r=rows[inp.dataset.i]; const k=inp.dataset.k; r[k]= k==='base_wage' ? (inp.value===''?null:Number(inp.value)) : inp.value;
+      if(k==='employee_id'){ const c=currentContract(r.employee_id); if(c){ r.employment_type=c.employment_type; r.wage_type=c.wage_type; draw(); } } check(); };
+      inp.oninput=h; inp.onchange=h; });
+    $$('[data-ix]',m).forEach(b=>b.onclick=()=>{ rows.splice(b.dataset.ix,1); draw(); check(); });
+    $$('[data-iv]',m).forEach(b=>b.onclick=()=>window.open(rows[b.dataset.iv].url,'_blank'));
+  };
+  const check=()=>{
+    const bad=rows.filter(r=>!r.employee_id || !r.start_date || (r.end_date && r.end_date<r.start_date)).length;
+    $('#imSave',m).disabled= !rows.length || bad>0;
+    $('#imMsg',m).textContent= rows.length ? (bad? `${bad}件で、従業員・開始日が未入力か、終了日が開始日より前になっています。` : `${rows.length}件を登録できます。`) : '';
+  };
+  const add=files=>{
+    for(const f of files){
+      const g=guessFromFilename(f.name); const empId= presetEmpId || g.emp?.id || '';
+      const c= empId? currentContract(empId) : null;
+      rows.push({ file:f, url:URL.createObjectURL(f), employee_id:empId, start_date:g.start, end_date:g.end,
+        employment_type:c?.employment_type||'パートタイム', wage_type:c?.wage_type||'時給', base_wage:null, note:'' });
+    }
+    draw(); check();
+  };
+  $('#imFiles',m).onchange=ev=>add(ev.target.files);
+  const drop=$('#imDrop',m);
+  drop.addEventListener('dragover',ev=>{ ev.preventDefault(); drop.style.background='#eef3ec'; });
+  drop.addEventListener('dragleave',()=>{ drop.style.background='#fafaf7'; });
+  drop.addEventListener('drop',ev=>{ ev.preventDefault(); drop.style.background='#fafaf7'; add(ev.dataTransfer.files); });
+  $('#imCancel',m).onclick=()=>{ rows.forEach(r=>URL.revokeObjectURL(r.url)); presetEmpId? openEmployee(presetEmpId) : closeModal(); };
+  $('#imSave',m).onclick=async()=>{
+    const btn=$('#imSave',m); btn.disabled=true; const t=todayStr(); let ok=0; const fails=[]; const touched=new Set();
+    for(let i=0;i<rows.length;i++){
+      const r=rows[i]; btn.textContent=`登録中… ${i+1}/${rows.length}`;
+      try{
+        const e=S.employees.find(x=>x.id===r.employee_id);
+        const ext=(r.file.name.split('.').pop()||'pdf').toLowerCase().replace(/[^a-z0-9]/g,'')||'pdf';
+        const path=`${e.code}/past_${r.start_date}_${Date.now()}_${i}.${ext}`;
+        const up=await sb.storage.from('contracts').upload(path, r.file, {upsert:false, contentType:r.file.type||undefined});
+        if(up.error) throw up.error;
+        const covers = r.start_date<=t && (!r.end_date || r.end_date>=t);
+        const payload={ employee_id:r.employee_id, seq:0, change_type:'過去分登録', employment_type:r.employment_type, is_fixed_term:!!r.end_date,
+          start_date:r.start_date, end_date:r.end_date||null, wage_type:r.wage_type, base_wage:r.base_wage,
+          status: covers? '締結済' : '終了', file_path:path, note:['過去の契約書を登録', r.note].filter(Boolean).join('：') };
+        const ins=await sb.from('contracts').insert(payload).select().single();
+        if(ins.error) throw ins.error;
+        S.contracts.push(ins.data); touched.add(r.employee_id); ok++;
+      }catch(err){ fails.push(`${r.file.name}：${err.message||err}`); }
+    }
+    for(const empId of touched) await renumberSeq(empId);
+    rows.forEach(r=>URL.revokeObjectURL(r.url));
+    alert(`${ok}件を登録しました。`+(fails.length? `\n\n登録できなかったもの：\n${fails.join('\n')}`:''));
+    render(); presetEmpId? openEmployee(presetEmpId) : closeModal();
+  };
+}
+// 契約の「回」を開始日順に振り直す
+async function renumberSeq(empId){
+  const list=S.contracts.filter(c=>c.employee_id===empId).sort((a,b)=>(a.start_date||'').localeCompare(b.start_date||'') || a.id-b.id);
+  for(let i=0;i<list.length;i++){
+    if(list[i].seq!==i+1){ const r=await sb.from('contracts').update({seq:i+1}).eq('id',list[i].id).select().single(); if(!r.error) Object.assign(list[i], r.data); }
+  }
 }
 
 // ===== 昇給検討 =====
