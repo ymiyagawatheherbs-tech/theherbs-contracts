@@ -161,7 +161,8 @@ function render(snap, opts={}){
   const P=T.preamble||{};
   const preamble = P.enabled && P.body ? `
   <div class="doc-page preamble">
-    <h1 style="letter-spacing:.08em">${esc(P.title||'契約にあたって')}</h1>
+    <h1 style="letter-spacing:.08em${P.subtitle?';margin-bottom:2mm':''}">${esc(P.title||'契約にあたって')}</h1>
+    ${P.subtitle?`<div class="pre-sub">${esc(P.subtitle)}</div>`:''}
     <div class="pre-to">${esc(e.name)}　さんへ</div>
     ${String(P.body).split('\n').filter(s=>s.trim()).map(s=> s.startsWith('#') ? `<div class="pre-h">${esc(s.slice(1).trim())}</div>` : `<p>${esc(s)}</p>`).join('')}
     <div class="pre-from">${esc(co.name||'')}<br>${esc(co.representative||'')}</div>
@@ -273,6 +274,7 @@ const STYLE = `
 .doc .preamble{font-size:10.5pt;line-height:1.9}
 .doc .preamble h1{margin:6mm 0 6mm;font-size:15pt}
 .doc .preamble p{margin:0 0 3mm;text-indent:1em}
+.doc .preamble .pre-sub{text-align:center;font-size:11pt;margin:0 0 7mm;letter-spacing:.04em}
 .doc .preamble .pre-to{margin-bottom:5mm;font-size:11pt}
 .doc .preamble .pre-h{font-weight:600;margin:4mm 0 1mm;border-left:3px solid #5b7f5f;padding-left:2mm}
 .doc .preamble .pre-from{text-align:right;margin-top:8mm}

@@ -10,7 +10,7 @@
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
-<script src="contract-render.js?v=20261112c"></script>
+<script src="contract-render.js?v=20261112d"></script>
 <style>
 :root{
   --bg:#f6f5f1; --panel:#fff; --ink:#22281f; --sub:#667060; --line:#dcded6; --line2:#eceee8;
@@ -958,7 +958,8 @@ function contractTextCard(){
     <div class="grid g2">
       <div>
         <label class="checks" style="margin-bottom:6px"><input type="checkbox" id="ctPreOn" ${T.preamble.enabled?'checked':''}> 前文（当社の考え方）を入れる</label>
-        <label class="f"><span>前文の見出し</span><input type="text" id="ctPreTitle" value="${esc(T.preamble.title||'')}"></label>
+        <div class="grid g2"><label class="f"><span>前文の見出し</span><input type="text" id="ctPreTitle" value="${esc(T.preamble.title||'')}"></label>
+        <label class="f"><span>前文の副題（見出しの下に小さく入る）</span><input type="text" id="ctPreSub" value="${esc(T.preamble.subtitle||'')}"></label></div>
         <label class="f" style="margin-top:8px"><span>前文の本文（1行1段落。行頭に # を付けると小見出し）</span><textarea id="ctPreBody" style="min-height:260px">${esc(T.preamble.body||'')}</textarea></label>
       </div>
       <div class="grid">
@@ -993,7 +994,7 @@ function contractTextCard(){
 function bindContractText(){
   const L=id=>$(id).value.split('\n').map(x=>x.replace(/\s+$/,'')).filter(x=>x.trim());
   const collect=()=>({
-    preamble:{enabled:$('#ctPreOn').checked, title:$('#ctPreTitle').value, body:$('#ctPreBody').value},
+    preamble:{enabled:$('#ctPreOn').checked, title:$('#ctPreTitle').value, subtitle:$('#ctPreSub').value, body:$('#ctPreBody').value},
     overtime:L('#ctOver'), leave:L('#ctLeave'), wageNote:$('#ctWageNote').value, retireNote:$('#ctRetNote').value,
     retire:L('#ctRetire'), renewalLead:$('#ctRenLead').value, renewalReq:L('#ctRenReq'),
     appearance:{lead:$('#ctApLead').value, items:L('#ctApItems'), tail:L('#ctApTail')},
