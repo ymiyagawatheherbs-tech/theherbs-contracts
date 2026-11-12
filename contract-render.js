@@ -176,7 +176,7 @@ function render(snap, opts={}){
     <h1>${title}</h1>
     <div class="head">
       <div class="to">${esc(e.name)}　殿</div>
-      <div class="co">所在地　${esc(co.address||'')}<br>名　称　${esc(co.name||'')}<br>氏　名　${esc(co.representative||'')} ${signed?'':'㊞'}</div>
+      <div class="co">所在地　${esc(co.address||'')}<br>名　称　${esc(co.name||'')}<br>氏　名　${esc(co.representative||'')}${(signed||opts.esign)?'':' ㊞'}</div>
     </div>
     <table class="ct"><tbody>
       <tr><th>契約期間</th><td>${fixed? `☑ 定めあり　令和 ${ws.y}年 ${ws.m}月 ${ws.d}日　～　令和 ${we.y}年 ${we.m}月 ${we.d}日` : `☑ 定めなし　令和 ${ws.y}年 ${ws.m}月 ${ws.d}日 から`}</td></tr>
