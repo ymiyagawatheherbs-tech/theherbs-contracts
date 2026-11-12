@@ -206,7 +206,7 @@ function render(snap, opts={}){
         ${(T.retire||[]).map((t,i)=>`${i+1}　${esc(t)}`+(i===0&&T.retireNote?`<br>＊ ${esc(T.retireNote)}`:'')).join('<br>')}
         ${fixed?`<br>${esc(T.renewalLead)}<br>【雇用契約更新の要件】<br>${(T.renewalReq||[]).map((t,i)=>`${i+1}　${esc(t)}`).join('<br>')}`:''}
         ${mkText?`<br>【無期転換申込機会】${esc(mkText)}`:''}`}</td></tr>
-      <tr><th>その他</th><td>・教育訓練：${isRegular?'会社の定めるところにより実施する':'正社員と同様の業務については、同等の教育訓練を実施する'}<br>・相談窓口：働き方や労働条件${isRegular?'':'、正社員への転換'}などの相談は、まず所属の上長${e.manager_name?`（${esc(e.manager_name)}）`:''}にしてください。上長に相談しにくいときや解決しないときは、${co.contact_dept?esc(co.contact_dept)+' ':''}${esc(co.contact_name||'')}${co.contact_tel?`（電話 ${esc(co.contact_tel)}）`:''}が受け付けます。相談したことを理由に不利益な扱いをすることはありません。</td></tr>
+      <tr><th>その他</th><td>・教育訓練：${isRegular?'会社の定めるところにより実施する':'正社員と同様の業務については、同等の教育訓練を実施する'}<br>・相談窓口：働き方や労働条件${isRegular?'':'、正社員への転換'}などの相談は、まず所属の上長にしてください。上長に相談しにくい場合、${esc(co.contact_name||'')}${co.contact_tel?`（${esc(co.contact_tel)}）`:''}が受け付けます。</td></tr>
     </tbody></table>
   </div>
   <div class="doc-page">
