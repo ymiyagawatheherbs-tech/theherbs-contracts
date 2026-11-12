@@ -9,7 +9,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-<script src="contract-render.js?v=20261112g"></script>
+<script src="contract-render.js?v=20261112h"></script>
 <style>
 :root{--bg:#f4f3ee;--ink:#22281f;--sub:#626b5d;--line:#d9dbd2;--accent:#3f6b45;--accent-soft:#e7efe6;--red:#b3261e;--red-soft:#fbe9e7}
 *{box-sizing:border-box}
@@ -103,7 +103,7 @@ function signView(){
     <h2>同意と署名</h2>
     <div class="agree">${CR.AGREEMENTS.map(a=>`<label><input type="checkbox" data-ag="${a.key}"><span>${esc(a.label)}</span></label>`).join('')}</div>
     <label class="f"><span>氏名（フルネーム）</span><input type="text" id="iName" autocomplete="name" placeholder="${esc(e.name)}"></label>
-    <label class="f"><span>住所（入社誓約書に記載されます）</span><input type="text" id="iAddr" autocomplete="street-address"></label>
+    <label class="f"><span>住所（誓約の欄に記載されます）</span><input type="text" id="iAddr" autocomplete="street-address"></label>
     <div class="f"><span class="small" style="font-weight:600;color:var(--sub)">署名（枠の中に指またはマウスで書いてください）</span>
       <canvas class="sigpad" id="pad"></canvas>
       <div class="row" style="justify-content:flex-end;margin-top:6px"><button class="btn" id="bClear" type="button">書き直す</button></div></div>

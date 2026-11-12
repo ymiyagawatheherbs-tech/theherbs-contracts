@@ -131,7 +131,7 @@ function buildSnapshot({contract, employee, company, text, mkYears, firstStart})
     mkInPeriod = reach <= c.end_date;
   }
   const t = mergeText(text); delete t.approved; delete t.approved_at;
-  return { version:1, contract:c, employee:{ name:employee.name, code:employee.code },
+  return { version:1, contract:c, employee:{ name:employee.name, code:employee.code, manager_name:employee.manager_name||null },
     company:{ name:company.name, address:company.address, representative:company.representative, contact_dept:company.contact_dept,
       contact_name:company.contact_name, contact_tel:company.contact_tel, closing_day:company.closing_day, pay_day:company.pay_day,
       locations:company.locations||[], departments:company.departments||[] },
@@ -153,7 +153,7 @@ function render(snap, opts={}){
   const hrsText= c.hours_per_day ? `${c.hours_per_day}時間` : '';
   const wdays=(c.work_weekdays||[]);
   const workDayText= wdays.length ? `勤務日：${wdays.join('・')}曜日` : c.shift_based ? '勤務日：シフトにより定める' : '';
-  const holidayText= c.holiday_text || (wdays.length ? '上記の勤務日以外の日' : c.shift_based ? 'シフトで定める勤務日以外の日' : '会社の定める休日');
+  const holidayText= c.holiday_text || (wdays.length ? '上記の勤務日以外の日、および会社カレンダーで定める休日（年末年始など）' : c.shift_based ? 'シフトで定める勤務日以外の日' : '会社カレンダーで定める休日');
   const mk=snap.mk||{years:5,inPeriod:false};
   const mkText= fixed && mk.inPeriod ? `本契約期間中に通算契約期間が${mk.years}年を超えるため、本契約期間の初日から末日までの間、無期労働契約への転換を申し込むことができる。` : '';
   const sd = signed ? wareki(jstDate(signed.signed_at)) : null;
@@ -186,7 +186,7 @@ function render(snap, opts={}){
       <tr><th>就業の場所</th><td>${locs.map(x=>`${ck((c.work_locations||[]).includes(x))} ${esc(x)}`).join('　　')}　　${ck(!!c.work_location_other)} 他（${esc(c.work_location_other||'　　　　　　　　')}）<br>異動の範囲：居所を変更しない範囲で、就業場所の変更を命じることがあります</td></tr>
       <tr><th>仕事の内容</th><td>${deps.map(x=>`${ck((c.departments||[]).includes(x))} ${esc(x)}`).join('　')}<br>異動の範囲：就業規則による<br>＊　${esc(c.job_detail||'仕事については業種を特定せず、関連業務その他を手伝ってもらう場合があります')}</td></tr>
       <tr><th>始業終業の時刻、休憩時間、所定時間外労働の有無</th><td>
-        <div class="inner-wrap"><table class="inner"><tbody>
+        <div class="inner-wrap"><table class="inner"><colgroup><col style="width:17mm"><col style="width:13mm"><col style="width:13mm"><col style="width:11mm"><col style="width:17mm"><col></colgroup><tbody>
           <tr><th>スタッフ</th><th>始業</th><th>終業</th><th>休憩</th><th>労働時間</th><th>休日等</th></tr>
           ${shifts.map((s,i)=>`<tr><td style="text-align:left">${ck(!!(s.in||s.out))} ${esc(s.label||`勤務${i+1}`)}</td><td>${esc(s.in||'　：　')}</td><td>${esc(s.out||'　：　')}</td>${i===0?`<td rowspan="4">${esc(brkText||'法定通り')}</td><td rowspan="4">${esc(hrsText)}</td><td rowspan="4" style="text-align:left">${workDayText?`${esc(workDayText)}<br>`:''}休日：${esc(holidayText)}<br>${ck(c.shift_based)} シフト制（週（${esc(c.days_per_week??'　')}）日程度勤務）<br>${ck(c.variable_hours)} １箇月単位の変形労働時間制対象</td>`:''}</tr>`).join('')}
         </tbody></table></div>
@@ -206,7 +206,7 @@ function render(snap, opts={}){
         ${(T.retire||[]).map((t,i)=>`${i+1}　${esc(t)}`+(i===0&&T.retireNote?`<br>＊ ${esc(T.retireNote)}`:'')).join('<br>')}
         ${fixed?`<br>${esc(T.renewalLead)}<br>【雇用契約更新の要件】<br>${(T.renewalReq||[]).map((t,i)=>`${i+1}　${esc(t)}`).join('<br>')}`:''}
         ${mkText?`<br>【無期転換申込機会】${esc(mkText)}`:''}`}</td></tr>
-      <tr><th>その他</th><td>・教育訓練：${isRegular?'会社の定めるところにより実施する':'正社員と同様の業務については、同等の教育訓練を実施する'}<br>・雇用管理の改善等に関する相談窓口${isRegular?'':'（正規転換推進措置等）'}<br>　部署名（${esc(co.contact_dept||'　　　　　　')}）　担当者名（ ${esc(co.contact_name||'')} ）　連絡先（ ${esc(co.contact_tel||'')} ）</td></tr>
+      <tr><th>その他</th><td>・教育訓練：${isRegular?'会社の定めるところにより実施する':'正社員と同様の業務については、同等の教育訓練を実施する'}<br>・相談窓口：働き方や労働条件${isRegular?'':'、正社員への転換'}などの相談は、まず所属の上長${e.manager_name?`（${esc(e.manager_name)}）`:''}にしてください。上長に相談しにくいときや解決しないときは、${co.contact_dept?esc(co.contact_dept)+' ':''}${esc(co.contact_name||'')}${co.contact_tel?`（電話 ${esc(co.contact_tel)}）`:''}が受け付けます。相談したことを理由に不利益な扱いをすることはありません。</td></tr>
     </tbody></table>
   </div>
   <div class="doc-page">
@@ -224,7 +224,7 @@ function render(snap, opts={}){
       ${(c.allowances||[]).map(a=>`<tr><td>${esc(a.name)}</td><td style="text-align:right">${a.amount!=null?yen(a.amount)+'円':''}</td><td class="tiny">${esc(a.memo||'')}</td></tr>`).join('')}
     </tbody></table>
     <div class="tiny">＊　${esc(T.commute||'')}</div>
-    <div class="sec">【入社誓約書】</div>
+    <div class="sec">【就業にあたっての誓約】</div>
     <ol class="svc">${(T.pledge||[]).map(t=>`<li>${esc(t)}</li>`).join('')}</ol>
     <div style="margin-top:3mm">以上貴社の雇用条件を認め、就労いたします。　　　　　${esignNote?'':dateTxt}</div>
     ${esignNote ? `<div class="sign esign-note" style="text-align:left">住所・氏名・署名は、いちばん下の「同意と署名」で入力します</div>` : signed ? `<div class="sigblock">
@@ -257,7 +257,7 @@ const AGREEMENTS = [
   {key:'terms', label:'雇用契約書（労働条件）の内容を確認し、同意します'},
   {key:'appearance', label:'アピアランスに関する誓約に同意します'},
   {key:'service', label:'服務心得を守ることに同意します'},
-  {key:'pledge', label:'入社誓約書の内容に同意します'},
+  {key:'pledge', label:'就業にあたっての誓約に同意します'},
   {key:'electronic', label:'この契約書を電子で受け取り、電子で署名することに同意します（紙での受け取りを希望する場合は署名せずに会社へ連絡してください）'}
 ];
 
@@ -271,7 +271,7 @@ const STYLE = `
 .doc table.ct{width:100%;border-collapse:collapse;table-layout:fixed}
 .doc table.ct > tbody > tr > th,.doc table.ct > tbody > tr > td{border:1px solid #000;padding:.9mm 1.6mm;vertical-align:middle}
 .doc table.ct > tbody > tr > th{width:31mm;font-weight:400;text-align:left}
-.doc table.inner{width:100%;border-collapse:collapse;margin-bottom:1mm}
+.doc table.inner{width:100%;border-collapse:collapse;margin-bottom:1mm;table-layout:fixed}
 .doc table.inner th,.doc table.inner td{border:1px solid #000;padding:.4mm 1.5mm;text-align:center;font-weight:400}
 .doc .sign{margin-top:1mm;text-align:right;white-space:nowrap}
 .doc .esig{display:inline-block;border-bottom:1px solid #000;padding:0 2mm;font-weight:600}

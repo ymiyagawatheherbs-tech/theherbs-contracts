@@ -10,7 +10,7 @@
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
-<script src="contract-render.js?v=20261112g"></script>
+<script src="contract-render.js?v=20261112h"></script>
 <style>
 :root{
   --bg:#f6f5f1; --panel:#fff; --ink:#22281f; --sub:#667060; --line:#dcded6; --line2:#eceee8;
@@ -267,7 +267,7 @@ function wageText(c){ if(!c) return ''; return `${c.wage_type} ${yen(c.base_wage
 // ===== データ読み込み =====
 async function loadAll(){
   const [emp, ws, loc, con, rev, bon, set, req] = await Promise.all([
-    sb.from('employees').select('id,code,name,hire_date,active,role,title,location_id,schedule,week_days,sort_order,email').order('code'),
+    sb.from('employees').select('id,code,name,hire_date,active,role,title,location_id,schedule,week_days,sort_order,email,work_days,use_shift,manager_id').order('code'),
     sb.from('work_settings').select('employee_id,daily_hours,sched_in,sched_out,break_hours'),
     sb.from('locations').select('id,name'),
     sb.from('contracts').select('*'),
@@ -500,6 +500,12 @@ const RAISE_BONUS_TEXT={
 function raiseBonusFor(type){ return type==='正社員'? RAISE_BONUS_TEXT.regular : RAISE_BONUS_TEXT.other; }
 // シフト制は神戸阪急を含む就業場所のときだけ（本社はシフト制ではない・2026-11-12）
 function isShiftLocation(locs){ return (locs||[]).some(x=>String(x).includes('神戸阪急')); }
+// 勤怠システムの「勤務曜日」（0=日〜6=土、7=日）を契約書の曜日に変換
+function weekdaysFromAttendance(e){
+  const map={0:'日',1:'月',2:'火',3:'水',4:'木',5:'金',6:'土',7:'日'}; const order=['月','火','水','木','金','土','日'];
+  const ds=[...new Set((e?.work_days||[]).map(n=>map[n]).filter(Boolean))];
+  return order.filter(d=>ds.includes(d));
+}
 function newContractFor(e){
   const ws=S.ws[e.id]; const t=todayStr();
   const start=t; const end=addDays(addMonths(start,12),-1);
@@ -511,6 +517,7 @@ function newContractFor(e){
     days_per_week:null, hours_per_day: ws?.daily_hours||null, weekly_hours:null, shift_based:isShiftLocation(loc?[loc]:[]), variable_hours:false,
     workers_comp:true, employment_insurance:true, social_insurance:false, renewal:'更新見込有り', renewal_cap:'∞',
     raise_text:RAISE_BONUS_TEXT.other.raise, bonus_text:RAISE_BONUS_TEXT.other.bonus, retirement_allowance_text:'なし',
+    work_weekdays: weekdaysFromAttendance(e), holiday_text:null,
     status:'下書き', signed_date:null, reason:'', note:'' };
 }
 function renewFrom(c){
@@ -522,6 +529,8 @@ function renewFrom(c){
   n.start_date = base;
   n.end_date = c.is_fixed_term ? addDays(addMonths(n.start_date,12),-1) : null;
   { const rb=raiseBonusFor(n.employment_type); n.raise_text=rb.raise; n.bonus_text=rb.bonus; }
+  // 勤務曜日：勤怠システムに登録があれば、それを最新として使う
+  { const emp=S.employees.find(x=>x.id===c.employee_id); const wd=weekdaysFromAttendance(emp); if(wd.length) n.work_weekdays=wd; }
   if(c.end_date && c.end_date < todayStr()) n.note=`前契約（${fmtD(c.end_date)}満了）の翌日から切れ目なく続く契約として作成。満了後も同じ条件で勤務していた期間を含みます`;
   return n;
 }
@@ -711,7 +720,8 @@ function shiftHours(s){
 // ===== 契約書の印刷 =====
 function snapshotFor(c){
   const e=S.employees.find(x=>x.id===c.employee_id);
-  return CR.buildSnapshot({ contract:c, employee:e, company:setting('company',{}), text:setting('contract_text',null),
+  const mgr=S.employees.find(x=>x.id===e?.manager_id);
+  return CR.buildSnapshot({ contract:c, employee:{...e, manager_name: mgr? mgr.name : null}, company:setting('company',{}), text:setting('contract_text',null),
     mkYears:setting('review_rules',{}).mukitenkan_years||5, firstStart:firstStart(e) });
 }
 function printContract(c){
@@ -976,7 +986,7 @@ function contractTextCard(){
         <label class="f"><span>退職の注記（1つ目の退職事由の下）</span><textarea id="ctRetNote">${esc(T.retireNote||'')}</textarea></label>
       </div>
     </div>
-    <details style="margin-top:12px"><summary class="small" style="cursor:pointer">そのほかの条文（退職事由・更新要件・アピアランス・服務心得・通勤手当・入社誓約）</summary>
+    <details style="margin-top:12px"><summary class="small" style="cursor:pointer">そのほかの条文（退職事由・更新要件・アピアランス・服務心得・通勤手当・就業にあたっての誓約）</summary>
       <div class="grid g2" style="margin-top:8px">
         <label class="f"><span>退職事由（1行1項目）</span><textarea id="ctRetire">${lines(T.retire)}</textarea></label>
         <label class="f"><span>更新の前提</span><textarea id="ctRenLead">${esc(T.renewalLead||'')}</textarea></label>
@@ -985,7 +995,7 @@ function contractTextCard(){
         <label class="f"><span>アピアランス 項目（1行1項目）</span><textarea id="ctApItems">${lines(T.appearance.items)}</textarea></label>
         <label class="f"><span>アピアランス 結び（1行1文）</span><textarea id="ctApTail">${lines(T.appearance.tail)}</textarea></label>
         <label class="f"><span>服務心得（1行1項目）</span><textarea id="ctService" style="min-height:200px">${lines(T.service)}</textarea></label>
-        <label class="f"><span>入社誓約（1行1項目）</span><textarea id="ctPledge" style="min-height:200px">${lines(T.pledge)}</textarea></label>
+        <label class="f"><span>就業にあたっての誓約（1行1項目）</span><textarea id="ctPledge" style="min-height:200px">${lines(T.pledge)}</textarea></label>
         <label class="f"><span>通勤手当の注記</span><textarea id="ctCommute">${esc(T.commute||'')}</textarea></label>
       </div>
     </details>
@@ -1089,7 +1099,7 @@ async function addRetiree(){
   const maxCode=Math.max(100, ...S.employees.filter(e=>e.code>=100 && e.code<999 && e.role!=='admin').map(e=>e.code));
   const payload={ code:maxCode+1, name, active:false, role:'staff', sort_order:maxCode+1, note:'退職者（雇用契約管理の記録用）' };
   if(/^\d{4}-\d{2}-\d{2}$/.test(hire)) payload.hire_date=hire;
-  const r=await sb.from('employees').insert(payload).select('id,code,name,hire_date,active,role,title,location_id,schedule,week_days,sort_order,email').single();
+  const r=await sb.from('employees').insert(payload).select('id,code,name,hire_date,active,role,title,location_id,schedule,week_days,sort_order,email,work_days,use_shift,manager_id').single();
   if(r.error){ alert('追加できませんでした：'+r.error.message); return null; }
   S.employees.push(r.data); toast(`${name}さんを退職者として追加しました`); return r.data;
 }
