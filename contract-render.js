@@ -156,7 +156,11 @@ function render(snap, opts={}){
   const sd = signed ? wareki(jstDate(signed.signed_at)) : null;
   const dateTxt = sd ? `令和 ${sd.y}年 ${sd.m}月 ${sd.d}日` : '令和　　年　　月　　日';
   const who = signed ? `<span class="esig">電子署名：${esc(signed.name)}</span>` : '（　　　　　　　　　　　㊞）';
-  const sign = `<div class="sign">上記内容に合意します　　${dateTxt}　${who}</div>`;
+  // 電子署名の画面（署名前）では、各所の押印欄の代わりに「最後にまとめて署名」と案内する
+  const esignNote = opts.esign && !signed;
+  const sign = esignNote ? `<div class="sign esign-note">署名は、いちばん下の「同意と署名」でまとめて行います</div>`
+    : `<div class="sign">上記内容に合意します　　${dateTxt}　${who}</div>`;
+  const insSign = esignNote ? `<div class="sign esign-note">署名は、いちばん下の「同意と署名」でまとめて行います</div>` : `<div class="sign">${dateTxt}　${who}</div>`;
   const wageKinds=['日給月給','日給','時給','月給'];
   const P=T.preamble||{};
   const preamble = P.enabled && P.body ? `
@@ -183,11 +187,15 @@ function render(snap, opts={}){
           <tr><th>スタッフ</th><th>始業</th><th>終業</th><th>休憩</th><th>労働時間</th><th>休日等</th></tr>
           ${shifts.map((s,i)=>`<tr><td style="text-align:left">${ck(!!(s.in||s.out))} ${esc(s.label||`勤務${i+1}`)}</td><td>${esc(s.in||'　：　')}</td><td>${esc(s.out||'　：　')}</td>${i===0?`<td rowspan="4">${esc(brkText||'法定通り')}</td><td rowspan="4">${esc(hrsText)}</td><td rowspan="4" style="text-align:left">${ck(c.shift_based)} シフト制（週（${esc(c.days_per_week??'　')}）日程度勤務）<br>${ck(c.variable_hours)} １箇月単位の変形労働時間制対象</td>`:''}</tr>`).join('')}
         </tbody></table></div>
+        <div class="shift-list">${(c.shifts||[]).filter(s=>s.in||s.out).map((s,i)=>`<div>☑ ${esc(s.label||`勤務${i+1}`)}　${esc(s.in||'')}〜${esc(s.out||'')}（休憩 ${esc(s.break_min!=null?s.break_min+'分':'法定通り')}）</div>`).join('')}
+          <div>1日の所定労働時間：${esc(hrsText||'—')}</div>
+          <div>${ck(c.shift_based)} シフト制（週（${esc(c.days_per_week??'　')}）日程度勤務）</div>
+          <div>${ck(c.variable_hours)} １箇月単位の変形労働時間制対象</div></div>
         ${(T.overtime||[]).map(s=> s.startsWith('　')? `${esc(s)}<br>` : `・${esc(s)}<br>`).join('')}
         ${sign}</td></tr>
       <tr><th>休暇</th><td>${(T.leave||[]).map(s=>`・${esc(s)}`).join('<br>')}</td></tr>
       <tr><th>賃金</th><td>1　賃金：${opts.mobile?'下記【賃金】に記載':'裏面に記載'}<br>2　締日支払日：賃金締日　毎月 ${esc(co.closing_day??10)}日　　賃金支払日　毎月 ${esc(co.pay_day??25)}日<br>　 ${esc(T.wageNote||'')}<br>3　昇給：${esc(c.raise_text||'')}<br>　 賞与：${esc(c.bonus_text||'')}　　退職金：${esc(c.retirement_allowance_text||'')}${sign}</td></tr>
-      <tr><th>加入保険</th><td>${ck(c.workers_comp)} 労災保険　　${ck(c.employment_insurance)} 雇用保険　　${ck(c.social_insurance)} 社会保険（健康保険・厚生年金）<br>${isRegular?'':`${ck(!c.social_insurance)} 週30時間未満の勤務を希望し、社会保険には加入しません<br>${ck(c.social_insurance)} 週30時間以上の勤務を希望し、社会保険に加入します<br>`}<div class="sign">${dateTxt}　${who}</div></td></tr>
+      <tr><th>加入保険</th><td>${ck(c.workers_comp)} 労災保険　　${ck(c.employment_insurance)} 雇用保険　　${ck(c.social_insurance)} 社会保険（健康保険・厚生年金）<br>${isRegular?'':`${ck(!c.social_insurance)} 週30時間未満の勤務を希望し、社会保険には加入しません<br>${ck(c.social_insurance)} 週30時間以上の勤務を希望し、社会保険に加入します<br>`}${insSign}</td></tr>
       <tr><th>退職に関する事項${fixed?`<br>雇用契約更新の要件<br>（有期契約対象者）<br>${ck(c.renewal==='更新見込有り')} 更新見込有り<br>${ck(c.renewal==='更新見込無し')} 更新見込無し<br><br>更新上限回数<br>（ ${esc(c.renewal_cap||'　')} 回まで）<br>無期転換申込機会<br>${mk.inPeriod?'☑ 有り':'☐ 有り'}<br>無期転換後の労働条件<br>☑ 条件変更なし`:''}</th>
       <td class="tiny">【退職に関する事項】<br>${isRegular?'正社員の退職・解雇については就業規則の定めによる。<br>':`非正規職員の契約については、下記のいずれかに該当する場合は退職したものとする<br>
         ${(T.retire||[]).map((t,i)=>`${i+1}　${esc(t)}`+(i===0&&T.retireNote?`<br>＊ ${esc(T.retireNote)}`:'')).join('<br>')}
@@ -213,8 +221,8 @@ function render(snap, opts={}){
     <div class="tiny">＊　${esc(T.commute||'')}</div>
     <div class="sec">【入社誓約書】</div>
     <ol class="svc">${(T.pledge||[]).map(t=>`<li>${esc(t)}</li>`).join('')}</ol>
-    <div style="margin-top:3mm">以上貴社の雇用条件を認め、就労いたします。　　　　　${dateTxt}</div>
-    ${signed ? `<div class="sigblock">
+    <div style="margin-top:3mm">以上貴社の雇用条件を認め、就労いたします。　　　　　${esignNote?'':dateTxt}</div>
+    ${esignNote ? `<div class="sign esign-note" style="text-align:left">住所・氏名・署名は、いちばん下の「同意と署名」で入力します</div>` : signed ? `<div class="sigblock">
         <div>住　所　${esc(signed.address)}</div>
         <div>氏　名　${esc(signed.name)}</div>
         <div class="sigimg"><img src="${esc(signed.signature)}" alt="署名"></div>
@@ -249,14 +257,14 @@ const AGREEMENTS = [
 ];
 
 const STYLE = `
-.doc{font-family:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP","Noto Serif CJK JP",serif;color:#000;font-size:8.8pt;line-height:1.38}
+.doc{font-family:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP","Noto Serif CJK JP",serif;color:#000;font-size:8.4pt;line-height:1.34}
 .doc-page{width:186mm;margin:0 auto;background:#fff}
 .doc h1{text-align:center;font-size:14pt;margin:0 0 2mm;letter-spacing:.2em;font-weight:600}
 .doc .head{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:3mm;gap:4mm}
 .doc .head .to{border-bottom:1px solid #000;min-width:70mm;font-size:11pt;padding-bottom:1mm}
 .doc .head .co{font-size:9.5pt;line-height:1.6}
 .doc table.ct{width:100%;border-collapse:collapse;table-layout:fixed}
-.doc table.ct > tbody > tr > th,.doc table.ct > tbody > tr > td{border:1px solid #000;padding:1.1mm 1.8mm;vertical-align:middle}
+.doc table.ct > tbody > tr > th,.doc table.ct > tbody > tr > td{border:1px solid #000;padding:.9mm 1.6mm;vertical-align:middle}
 .doc table.ct > tbody > tr > th{width:31mm;font-weight:400;text-align:left}
 .doc table.inner{width:100%;border-collapse:collapse;margin-bottom:1mm}
 .doc table.inner th,.doc table.inner td{border:1px solid #000;padding:.4mm 1.5mm;text-align:center;font-weight:400}
@@ -267,14 +275,16 @@ const STYLE = `
 .doc .center{text-align:center}
 .doc table.wage{border-collapse:collapse;width:120mm;margin:1mm 0}
 .doc table.wage td{border:1px solid #000;padding:1mm 2mm}
-.doc .tiny{font-size:8pt;line-height:1.32}
-.doc ol.svc{padding-left:6mm;font-size:8.1pt;line-height:1.3}
+.doc .tiny{font-size:7.8pt;line-height:1.3}
+.doc ol.svc{padding-left:6mm;font-size:7.9pt;line-height:1.28}
 .doc .sigblock{margin-top:3mm;margin-left:80mm;line-height:2.2}
 .doc .sigimg img{height:16mm;max-width:80mm;display:block}
-.doc .preamble{font-size:10.5pt;line-height:1.9}
+.doc .preamble{font-size:10pt;line-height:1.85}
 .doc .preamble h1{margin:6mm 0 6mm;font-size:15pt}
 .doc .preamble p{margin:0 0 3mm;text-indent:1em}
 .doc .preamble .pre-sub{text-align:center;font-size:11pt;margin:0 0 7mm;letter-spacing:.04em}
+.doc .shift-list{display:none}
+.doc .esign-note{color:#5b7f5f;font-weight:600;white-space:normal}
 .doc .preamble .pre-to{margin-bottom:5mm;font-size:11pt}
 .doc .preamble .pre-h{font-weight:600;margin:4mm 0 1mm;border-left:3px solid #5b7f5f;padding-left:2mm}
 .doc .preamble .pre-from{text-align:right;margin-top:8mm}
@@ -295,8 +305,9 @@ const STYLE = `
   .doc:not(.fixed) table.ct, .doc:not(.fixed) table.ct > tbody, .doc:not(.fixed) table.ct > tbody > tr{display:block;width:100%}
   .doc:not(.fixed) table.ct > tbody > tr > th,.doc:not(.fixed) table.ct > tbody > tr > td{display:block;width:auto;border:0;padding:6px 0}
   .doc:not(.fixed) table.ct > tbody > tr > th{background:#eef3ec;padding:6px 8px;margin-top:10px;font-weight:600;border-radius:4px}
-  .doc:not(.fixed) .inner-wrap{overflow-x:auto}
-  .doc:not(.fixed) table.inner{font-size:12px;min-width:520px}
+  .doc:not(.fixed) .inner-wrap{display:none}
+  .doc:not(.fixed) .sign.esign-note{color:#3f6b45;background:#eef3ec;padding:6px 8px;border-radius:4px}
+  .doc:not(.fixed) .shift-list{display:block;margin-bottom:8px;padding:8px 10px;background:#f6f6f2;border-radius:6px}
   .doc:not(.fixed) .sign{white-space:normal;text-align:left;margin-top:8px;color:#444}
   .doc:not(.fixed) .tiny,.doc:not(.fixed) ol.svc{font-size:13px;line-height:1.65}
   .doc:not(.fixed) table.wage{width:100%}

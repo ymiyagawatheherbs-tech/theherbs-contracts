@@ -9,7 +9,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-<script src="contract-render.js?v=20261112d"></script>
+<script src="contract-render.js?v=20261112e"></script>
 <style>
 :root{--bg:#f4f3ee;--ink:#22281f;--sub:#626b5d;--line:#d9dbd2;--accent:#3f6b45;--accent-soft:#e7efe6;--red:#b3261e;--red-soft:#fbe9e7}
 *{box-sizing:border-box}
@@ -98,7 +98,7 @@ function signView(){
     <div class="steps"><b>1. 内容を読む</b>→<span>2. 項目ごとに同意</span>→<span>3. 署名して送信</span></div>
     <div class="row" style="margin-top:10px"><button class="btn" id="bPrint">印刷用のレイアウトで見る・印刷する</button></div>
   </div>
-  <div class="docbox">${CR.render(s,{mobile:innerWidth<761})}</div>
+  <div class="docbox">${CR.render(s,{mobile:innerWidth<761, esign:true})}</div>
   <div class="card" id="signCard">
     <h2>同意と署名</h2>
     <div class="agree">${CR.AGREEMENTS.map(a=>`<label><input type="checkbox" data-ag="${a.key}"><span>${esc(a.label)}</span></label>`).join('')}</div>
@@ -111,7 +111,7 @@ function signView(){
     <button class="btn pri" id="bSubmit" style="width:100%;margin-top:8px" disabled>署名して送信する</button>
     <p class="small muted" style="margin-bottom:0">送信すると、この内容で契約が成立したものとして会社に記録されます。送信後に控えをPDFで保存できます。わからない点があれば、送信する前に会社へご相談ください。</p>
   </div>`;
-  $('#bPrint').onclick=()=>{ $('#printArea').innerHTML=CR.render(s,{fixed:true}); CR.fitPages($('#printArea')); setTimeout(()=>print(),50); };
+  $('#bPrint').onclick=()=>{ $('#printArea').innerHTML=CR.render(s,{fixed:true, esign:true}); CR.fitPages($('#printArea')); setTimeout(()=>print(),50); };
   const pad=setupPad($('#pad'));
   const check=()=>{
     const allAg=[...document.querySelectorAll('[data-ag]')].every(x=>x.checked);
