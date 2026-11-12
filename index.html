@@ -1190,6 +1190,16 @@ function raiseFor(avg, wageType){
   const sorted=[...table].sort((a,b)=>b.min-a.min);
   return sorted.find(r=>avg>=r.min) || null;
 }
+// 昇給の適用日の初期値：正社員は7月支給分から（賃金規程第15条）＝6月の締日翌日から始まる賃金計算期間。それ以外は契約更新日
+function defaultRaiseDate(c){
+  if(!c) return '';
+  if(c.employment_type==='正社員'){
+    const t=todayStr(); const y=Number(t.slice(0,4)); const cd=Number(setting('company',{}).closing_day||10);
+    let d=`${y}-06-${String(cd+1).padStart(2,'0')}`; if(d<t) d=`${y+1}-06-${String(cd+1).padStart(2,'0')}`;
+    return d;
+  }
+  return c.end_date? addDays(c.end_date,1) : '';
+}
 function gradeFor(wage){
   const gs=setting('wage_grades',[]);
   return gs.find(g=>wage>=g.min && wage<=g.max) || null;
@@ -1273,7 +1283,7 @@ function drawReviewSheet(stats){
           <label class="f"><span>提案額（円）</span><input type="number" id="rvProp" step="10" value="${esc(ed?.proposed_wage??'')}"></label>
           <label class="f"><span>決定額（円）</span><input type="number" id="rvDec" step="10" value="${esc(ed?.decided_wage??'')}"></label>
           <label class="f"><span>結果</span><select id="rvDecision">${['検討中','昇給','据え置き','降給','保留'].map(x=>`<option ${x===(ed?.decision||'検討中')?'selected':''}>${x}</option>`).join('')}</select></label>
-          <label class="f"><span>適用日</span><input type="date" id="rvEff" value="${esc(ed?.effective_date || (c?.end_date? addDays(c.end_date,1):''))}"></label>
+          <label class="f"><span>適用日</span><input type="date" id="rvEff" value="${esc(ed?.effective_date || defaultRaiseDate(c))}"></label>
           <label class="f"><span>承認者</span><input type="text" id="rvAppr" value="${esc(ed?.approver||'')}"></label>
           <label class="f"><span>検討日</span><input type="date" id="rvDate" value="${esc(ed?.review_date||todayStr())}"></label>
         </div>
@@ -1351,12 +1361,9 @@ function drawReviewSheet(stats){
 const bonusState={label:'', from:'', to:'', pay:'', rows:null};
 function coefFrom(table, v){ const s=[...(table||[])].sort((a,b)=>b.min-a.min); const r=s.find(x=>v>=x.min); return r? r.coef : 1; }
 function defaultBonusPeriod(){
-  const t=parseD(todayStr()); const y=t.getFullYear();
-  // 冬季：5/11〜11/10（12月支給）、夏季：11/11〜5/10（7月支給）
-  const m=t.getMonth()+1;
-  if(m>=6 && m<=12) return {label:`${y}年冬季`, from:`${y}-05-11`, to:`${y}-11-10`, pay:`${y}-12-10`};
-  const py = m<=5? y-1 : y;
-  return {label:`${py+1}年夏季`, from:`${py}-11-11`, to:`${py+1}-05-10`, pay:`${py+1}-07-10`};
+  // 賃金規程 第16・17条：定期賞与は12月の年1回、算定期間は前年12/1〜当年11/30（支給日は画面で修正できます）
+  const y=parseD(todayStr()).getFullYear();
+  return {label:`${y}年 定期賞与`, from:`${y-1}-12-01`, to:`${y}-11-30`, pay:`${y}-12-10`};
 }
 async function renderBonus(){
   const el=$('#tab-bonus');
@@ -1413,9 +1420,16 @@ async function calcBonus(){
     const rate= (wd+ab)>0? wd/(wd+ab) : null;
     const attCoef= rate!=null? coefFrom(br.attendance_coef, rate) : 1;
     const hire=e.hire_date||firstStart(e);
-    const eligible= !!hire && hire<=bonusState.from;
+    // 賃金規程 第16条：支給日に1年以上在籍、かつ算定期間の全期間に在籍
+    const fullPeriod= !!hire && hire<=bonusState.from;
+    const oneYear= !!hire && (!bonusState.pay || hire<=addMonths(bonusState.pay,-12));
+    const isRegular= type==='正社員';
+    const eligible= fullPeriod && oneYear && isRegular;
     const amount= eligible? Math.floor(baseAmount*evalCoef*attCoef/1000)*1000 : 0;
-    const notes=[]; if(!eligible) notes.push('算定期間の途中入社のため対象外（基準）'); if(avg==null) notes.push('評価記録なし：係数1.0で仮計算'); if(rate==null) notes.push('勤怠データなし');
+    const notes=[];
+    if(c && !isRegular) notes.push('正社員以外は原則支給なし（非正規従業員規程第40条）。寸志はその都度決めて金額を手入力');
+    else if(!oneYear) notes.push('支給日時点で在籍1年未満のため対象外（賃金規程第16条）');
+    else if(!fullPeriod) notes.push('算定期間の途中入社のため対象外（賃金規程第16条）'); if(avg==null) notes.push('評価記録なし：係数1.0で仮計算'); if(rate==null) notes.push('勤怠データなし');
     if(!c) notes.push('契約未登録のため基準額なし');
     return {e, c, baseAmount, evalCoef, rate, attCoef, amount, note:notes.join('／'), eligible};
   });
@@ -1466,7 +1480,9 @@ function renderSettings(){
       <label class="f"><span>無期転換の通算年数</span><input type="number" id="rrMk" value="${esc(rr.mukitenkan_years??5)}"></label>
       <label class="f"><span>遅刻の目安（期間内・回）</span><input type="number" id="rrLate" value="${esc(rr.attendance_guide?.late_max??3)}"></label>
       <label class="f"><span>欠勤の目安（期間内・日）</span><input type="number" id="rrAbs" value="${esc(rr.attendance_guide?.absence_max??3)}"></label>
+      <label class="f"><span>正社員の評価月（7月支給分から昇給）</span><input type="number" id="rrMonth" min="1" max="12" value="${esc(rr.annual_review_month??6)}"></label>
     </div>
+    <p class="small muted">正社員：毎年この月に評価し、7月支給分から昇給（昇給日に勤続1年以上・賃金規程第15条）。パート・アルバイト・契約社員：定期昇給はなく、契約更新の前に評価して賃金を見直す（非正規従業員規程第40条）。</p>
     <h3>評価項目</h3>
     <div id="edItems"></div>
     <h3>昇給テーブル（時給）</h3>
@@ -1521,7 +1537,7 @@ function renderSettings(){
   $('#mwSave').onclick=()=>saveSetting('min_wage',{...mw, pref:$('#mwPref').value, amount:Number($('#mwAmt').value), effective:$('#mwEff').value, prev: (Number($('#mwAmt').value)!==mw.amount? mw.amount : mw.prev)});
   $('#rrSave').onclick=()=>{
     const its=items.get().map((x,i)=>({key: x.key || ('item'+(i+1)+'_'+Math.random().toString(36).slice(2,6)), label:x.label})).filter(x=>x.label);
-    saveSetting('review_rules',{...rr, alert_days:Number($('#rrAlert').value), mukitenkan_years:Number($('#rrMk').value), attendance_guide:{late_max:Number($('#rrLate').value), absence_max:Number($('#rrAbs').value)}, items:its, raise_table:raise.get(), raise_table_monthly:raiseM.get()});
+    saveSetting('review_rules',{...rr, alert_days:Number($('#rrAlert').value), mukitenkan_years:Number($('#rrMk').value), annual_review_month:Number($('#rrMonth').value)||6, attendance_guide:{late_max:Number($('#rrLate').value), absence_max:Number($('#rrAbs').value)}, items:its, raise_table:raise.get(), raise_table_monthly:raiseM.get()});
   };
   $('#grSave').onclick=()=>saveSetting('wage_grades', grades.get());
   $('#brSave').onclick=()=>{
@@ -1566,7 +1582,7 @@ function printPolicy(){
   </ol>
   <h2>3. 賃金の見直し</h2>
   <ol>
-    <li>見直しの時期：契約更新時、および毎年10月の最低賃金改定時。正社員は年1回（${esc(rr.annual_review_month??9)}月）に行う。</li>
+    <li>見直しの時期：正社員は毎年${esc(rr.annual_review_month??6)}月に評価し、7月支給分から昇給する（昇給日に勤続1年以上の者・賃金規程第15条）。パートタイム・アルバイト・契約社員は定期昇給を行わず、契約更新の前に評価して賃金を見直す（非正規従業員規程第40条）。いずれも、毎年10月の最低賃金改定時に下回る者は発効日から改定する。</li>
     <li>最低賃金：${esc(mw.pref||'')} ${yen(mw.amount)}円（${fmtD(mw.effective)}発効）。改定時は全員の時給換算額を確認し、下回る者は発効日から改定する。</li>
     <li>評価：次の項目をそれぞれ5段階で評価し、平均点で昇給額の目安を決める。勤怠（遅刻・欠勤）は勤怠システムの記録を用いる。目安：期間内の遅刻${esc(rr.attendance_guide?.late_max??'-')}回以内、欠勤${esc(rr.attendance_guide?.absence_max??'-')}日以内。</li>
   </ol>
