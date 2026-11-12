@@ -498,6 +498,8 @@ const RAISE_BONUS_TEXT={
   other:{raise:'定期昇給なし（契約更新時に、勤務成績等により賃金を改定することがある）', bonus:'なし（原則として支給しない）'}
 };
 function raiseBonusFor(type){ return type==='正社員'? RAISE_BONUS_TEXT.regular : RAISE_BONUS_TEXT.other; }
+// シフト制は神戸阪急を含む就業場所のときだけ（本社はシフト制ではない・2026-11-12）
+function isShiftLocation(locs){ return (locs||[]).some(x=>String(x).includes('神戸阪急')); }
 function newContractFor(e){
   const ws=S.ws[e.id]; const t=todayStr();
   const start=t; const end=addDays(addMonths(start,12),-1);
@@ -506,7 +508,7 @@ function newContractFor(e){
     start_date:start, end_date:end, wage_type:'時給', base_wage:minWage()||'', allowances:[], work_locations: loc?[loc]:[], work_location_other:'',
     departments:[], job_detail:'仕事については業種を特定せず、関連業務その他を手伝ってもらう場合があります',
     shifts: ws&&ws.sched_in? [{label:'勤務1',in:ws.sched_in.slice(0,5),out:(ws.sched_out||'').slice(0,5),break_min:Math.round((ws.break_hours||0)*60)}] : [],
-    days_per_week:null, hours_per_day: ws?.daily_hours||null, weekly_hours:null, shift_based:true, variable_hours:false,
+    days_per_week:null, hours_per_day: ws?.daily_hours||null, weekly_hours:null, shift_based:isShiftLocation(loc?[loc]:[]), variable_hours:false,
     workers_comp:true, employment_insurance:true, social_insurance:false, renewal:'更新見込有り', renewal_cap:'∞',
     raise_text:RAISE_BONUS_TEXT.other.raise, bonus_text:RAISE_BONUS_TEXT.other.bonus, retirement_allowance_text:'なし',
     status:'下書き', signed_date:null, reason:'', note:'' };
@@ -601,6 +603,8 @@ function openContractForm(c){
   $('#fAddShift',m).onclick=()=>{ if(shifts.length>=4){ alert('契約書の様式上、勤務パターンは4つまでです'); return; } shifts.push({label:`勤務${shifts.length+1}`,in:'09:00',out:'17:00',break_min:60}); drawShifts(); };
 
   const F=n=>m.querySelector(`[name="${n}"]`);
+  // 就業場所を変えたら、シフト制のチェックを場所に合わせる（あとから手で変えられる）
+  $$('[name=loc]',m).forEach(cb=>cb.addEventListener('change',()=>{ F('shift_based').checked=isShiftLocation($$('[name=loc]:checked',m).map(x=>x.value)); }));
   // 雇用形態を変えたら、昇給・賞与欄が初期値のままなら新しい雇用形態の初期値に入れ替える
   F('employment_type').addEventListener('change',()=>{
     const known=[RAISE_BONUS_TEXT.regular, RAISE_BONUS_TEXT.other, {raise:'なし（昇給については契約更新時に賃金改定を行うことがある）', bonus:'なし'}];
