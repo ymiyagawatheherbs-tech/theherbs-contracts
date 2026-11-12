@@ -492,6 +492,12 @@ async function viewFile(c){
 }
 
 // ===== 契約フォーム =====
+// 昇給・賞与欄の初期値（賃金規程第15・16条、非正規従業員規程第40条）
+const RAISE_BONUS_TEXT={
+  regular:{raise:'毎年7月支給分から、勤務成績その他を勘案して行う（賃金規程第15条）', bonus:'12月に、会社の業績と勤務成績等を勘案して支給することがある（賃金規程第16条）'},
+  other:{raise:'定期昇給なし（契約更新時に、勤務成績等により賃金を改定することがある）', bonus:'なし（原則として支給しない）'}
+};
+function raiseBonusFor(type){ return type==='正社員'? RAISE_BONUS_TEXT.regular : RAISE_BONUS_TEXT.other; }
 function newContractFor(e){
   const ws=S.ws[e.id]; const t=todayStr();
   const start=t; const end=addDays(addMonths(start,12),-1);
@@ -502,7 +508,7 @@ function newContractFor(e){
     shifts: ws&&ws.sched_in? [{label:'勤務1',in:ws.sched_in.slice(0,5),out:(ws.sched_out||'').slice(0,5),break_min:Math.round((ws.break_hours||0)*60)}] : [],
     days_per_week:null, hours_per_day: ws?.daily_hours||null, weekly_hours:null, shift_based:true, variable_hours:false,
     workers_comp:true, employment_insurance:true, social_insurance:false, renewal:'更新見込有り', renewal_cap:'∞',
-    raise_text:'なし（昇給については契約更新時に賃金改定を行うことがある）', bonus_text:'なし', retirement_allowance_text:'なし',
+    raise_text:RAISE_BONUS_TEXT.other.raise, bonus_text:RAISE_BONUS_TEXT.other.bonus, retirement_allowance_text:'なし',
     status:'下書き', signed_date:null, reason:'', note:'' };
 }
 function renewFrom(c){
@@ -513,6 +519,7 @@ function renewFrom(c){
   const base = c.end_date ? addDays(c.end_date,1) : todayStr();
   n.start_date = base;
   n.end_date = c.is_fixed_term ? addDays(addMonths(n.start_date,12),-1) : null;
+  { const rb=raiseBonusFor(n.employment_type); n.raise_text=rb.raise; n.bonus_text=rb.bonus; }
   if(c.end_date && c.end_date < todayStr()) n.note=`前契約（${fmtD(c.end_date)}満了）の翌日から切れ目なく続く契約として作成。満了後も同じ条件で勤務していた期間を含みます`;
   return n;
 }
@@ -594,6 +601,13 @@ function openContractForm(c){
   $('#fAddShift',m).onclick=()=>{ if(shifts.length>=4){ alert('契約書の様式上、勤務パターンは4つまでです'); return; } shifts.push({label:`勤務${shifts.length+1}`,in:'09:00',out:'17:00',break_min:60}); drawShifts(); };
 
   const F=n=>m.querySelector(`[name="${n}"]`);
+  // 雇用形態を変えたら、昇給・賞与欄が初期値のままなら新しい雇用形態の初期値に入れ替える
+  F('employment_type').addEventListener('change',()=>{
+    const known=[RAISE_BONUS_TEXT.regular, RAISE_BONUS_TEXT.other, {raise:'なし（昇給については契約更新時に賃金改定を行うことがある）', bonus:'なし'}];
+    const rb=raiseBonusFor(F('employment_type').value);
+    if(known.some(k=>k.raise===F('raise_text').value)) F('raise_text').value=rb.raise;
+    if(known.some(k=>k.bonus===F('bonus_text').value)) F('bonus_text').value=rb.bonus;
+  });
   $('#fPeriod',m).onchange=ev=>{ const mo=Number(ev.target.value); if(mo && F('start_date').value) F('end_date').value=addDays(addMonths(F('start_date').value,mo),-1); };
   F('is_fixed_term').onchange=()=>{ if(F('is_fixed_term').value==='0') F('end_date').value=''; };
   const check=()=>{
