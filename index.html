@@ -10,7 +10,7 @@
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
-<script src="contract-render.js"></script>
+<script src="contract-render.js?v=20261112b"></script>
 <style>
 :root{
   --bg:#f6f5f1; --panel:#fff; --ink:#22281f; --sub:#667060; --line:#dcded6; --line2:#eceee8;
@@ -709,6 +709,7 @@ function snapshotFor(c){
 }
 function printContract(c){
   $('#printArea').innerHTML=CR.render(snapshotFor(c),{fixed:true});
+  CR.fitPages($('#printArea'));
   setTimeout(()=>window.print(),50);
 }
 function signedOpts(r){
@@ -718,6 +719,7 @@ function signedOpts(r){
 }
 function printSigned(r){
   $('#printArea').innerHTML=CR.render(r.snapshot, {...signedOpts(r), fixed:true});
+  CR.fitPages($('#printArea'));
   setTimeout(()=>window.print(),50);
 }
 
@@ -1007,6 +1009,7 @@ function bindContractText(){
     const e=activeStaff()[0]; const c=currentContract(e?.id) || S.contracts[0]; if(!c){ alert('見本にできる契約がありません'); return; }
     const emp=S.employees.find(x=>x.id===c.employee_id);
     $('#printArea').innerHTML=CR.render(CR.buildSnapshot({contract:c, employee:emp, company:setting('company',{}), text:collect(), mkYears:5, firstStart:firstStart(emp)}),{fixed:true});
+    CR.fitPages($('#printArea'));
     setTimeout(()=>window.print(),50);
   };
 }

@@ -248,13 +248,13 @@ const AGREEMENTS = [
 ];
 
 const STYLE = `
-.doc{font-family:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;color:#000;font-size:8.8pt;line-height:1.38}
+.doc{font-family:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP","Noto Serif CJK JP",serif;color:#000;font-size:8.8pt;line-height:1.38}
 .doc-page{width:186mm;margin:0 auto;background:#fff}
 .doc h1{text-align:center;font-size:14pt;margin:0 0 2mm;letter-spacing:.2em;font-weight:600}
 .doc .head{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:3mm;gap:4mm}
 .doc .head .to{border-bottom:1px solid #000;min-width:70mm;font-size:11pt;padding-bottom:1mm}
 .doc .head .co{font-size:9.5pt;line-height:1.6}
-.doc table.ct{width:100%;border-collapse:collapse}
+.doc table.ct{width:100%;border-collapse:collapse;table-layout:fixed}
 .doc table.ct > tbody > tr > th,.doc table.ct > tbody > tr > td{border:1px solid #000;padding:1.1mm 1.8mm;vertical-align:middle}
 .doc table.ct > tbody > tr > th{width:31mm;font-weight:400;text-align:left}
 .doc table.inner{width:100%;border-collapse:collapse;margin-bottom:1mm}
@@ -300,6 +300,20 @@ const STYLE = `
 }`;
 function injectStyles(){ if(document.getElementById('contract-render-style')) return; const s=document.createElement('style'); s.id='contract-render-style'; s.textContent=STYLE; document.head.appendChild(s); }
 
+// 印刷用：1ページ分が A4 の印刷範囲に収まらないときは、そのページだけ縮小して1枚に収める
+// （ブラウザやフォントの違いで数行あふれるのを防ぐ。maxMm は余白を除いた高さの目安）
+function fitPages(root, maxMm){
+  const max=(maxMm||265)*96/25.4;
+  const prev=root.getAttribute('style')||'';
+  root.style.cssText='display:block;position:absolute;left:-10000px;top:0;visibility:hidden';
+  root.querySelectorAll('.doc-page').forEach(pg=>{
+    pg.style.zoom='';
+    const h=pg.getBoundingClientRect().height;
+    if(h>max) pg.style.zoom=String(Math.floor(max/h*1000)/1000);
+  });
+  root.setAttribute('style',prev);
+}
+
 // 1ページずつ画像にしてA4に収める（html2canvas + jsPDF）
 async function toPdf(html){
   const box=document.createElement('div');
@@ -320,5 +334,5 @@ async function toPdf(html){
   } finally { box.remove(); }
 }
 
-global.ContractRender = { toPdf, ORIGINAL_TEXT, PROPOSED_TEXT, AGREEMENTS, mergeText, buildSnapshot, render, injectStyles, jstDateTime };
+global.ContractRender = { toPdf, fitPages, ORIGINAL_TEXT, PROPOSED_TEXT, AGREEMENTS, mergeText, buildSnapshot, render, injectStyles, jstDateTime };
 })(window);
