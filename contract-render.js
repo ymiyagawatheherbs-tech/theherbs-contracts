@@ -151,6 +151,9 @@ function render(snap, opts={}){
   const brk=(c.shifts||[]).map(s=>s.break_min).filter(v=>v!=null);
   const brkText= brk.length && brk.every(v=>v===brk[0]) ? `${brk[0]}分` : '';
   const hrsText= c.hours_per_day ? `${c.hours_per_day}時間` : '';
+  const wdays=(c.work_weekdays||[]);
+  const workDayText= wdays.length ? `勤務日：${wdays.join('・')}曜日` : c.shift_based ? '勤務日：シフトにより定める' : '';
+  const holidayText= c.holiday_text || (wdays.length ? '上記の勤務日以外の日' : c.shift_based ? 'シフトで定める勤務日以外の日' : '会社の定める休日');
   const mk=snap.mk||{years:5,inPeriod:false};
   const mkText= fixed && mk.inPeriod ? `本契約期間中に通算契約期間が${mk.years}年を超えるため、本契約期間の初日から末日までの間、無期労働契約への転換を申し込むことができる。` : '';
   const sd = signed ? wareki(jstDate(signed.signed_at)) : null;
@@ -185,10 +188,12 @@ function render(snap, opts={}){
       <tr><th>始業終業の時刻、休憩時間、所定時間外労働の有無</th><td>
         <div class="inner-wrap"><table class="inner"><tbody>
           <tr><th>スタッフ</th><th>始業</th><th>終業</th><th>休憩</th><th>労働時間</th><th>休日等</th></tr>
-          ${shifts.map((s,i)=>`<tr><td style="text-align:left">${ck(!!(s.in||s.out))} ${esc(s.label||`勤務${i+1}`)}</td><td>${esc(s.in||'　：　')}</td><td>${esc(s.out||'　：　')}</td>${i===0?`<td rowspan="4">${esc(brkText||'法定通り')}</td><td rowspan="4">${esc(hrsText)}</td><td rowspan="4" style="text-align:left">${ck(c.shift_based)} シフト制（週（${esc(c.days_per_week??'　')}）日程度勤務）<br>${ck(c.variable_hours)} １箇月単位の変形労働時間制対象</td>`:''}</tr>`).join('')}
+          ${shifts.map((s,i)=>`<tr><td style="text-align:left">${ck(!!(s.in||s.out))} ${esc(s.label||`勤務${i+1}`)}</td><td>${esc(s.in||'　：　')}</td><td>${esc(s.out||'　：　')}</td>${i===0?`<td rowspan="4">${esc(brkText||'法定通り')}</td><td rowspan="4">${esc(hrsText)}</td><td rowspan="4" style="text-align:left">${workDayText?`${esc(workDayText)}<br>`:''}休日：${esc(holidayText)}<br>${ck(c.shift_based)} シフト制（週（${esc(c.days_per_week??'　')}）日程度勤務）<br>${ck(c.variable_hours)} １箇月単位の変形労働時間制対象</td>`:''}</tr>`).join('')}
         </tbody></table></div>
         <div class="shift-list">${(c.shifts||[]).filter(s=>s.in||s.out).map((s,i)=>`<div>☑ ${esc(s.label||`勤務${i+1}`)}　${esc(s.in||'')}〜${esc(s.out||'')}（休憩 ${esc(s.break_min!=null?s.break_min+'分':'法定通り')}）</div>`).join('')}
           <div>1日の所定労働時間：${esc(hrsText||'—')}</div>
+          ${workDayText?`<div>${esc(workDayText)}</div>`:''}
+          <div>休日：${esc(holidayText)}</div>
           <div>${ck(c.shift_based)} シフト制（週（${esc(c.days_per_week??'　')}）日程度勤務）</div>
           <div>${ck(c.variable_hours)} １箇月単位の変形労働時間制対象</div></div>
         ${(T.overtime||[]).map(s=> s.startsWith('　')? `${esc(s)}<br>` : `・${esc(s)}<br>`).join('')}

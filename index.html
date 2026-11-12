@@ -10,7 +10,7 @@
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
-<script src="contract-render.js?v=20261112f"></script>
+<script src="contract-render.js?v=20261112g"></script>
 <style>
 :root{
   --bg:#f6f5f1; --panel:#fff; --ink:#22281f; --sub:#667060; --line:#dcded6; --line2:#eceee8;
@@ -568,6 +568,10 @@ function openContractForm(c){
       <label class="f"><span>週の所定時間</span><input type="number" name="weekly_hours" value="${esc(c.weekly_hours??'')}" step="0.25"></label>
       <div class="checks" style="align-self:end"><label><input type="checkbox" name="shift_based" ${c.shift_based?'checked':''}>シフト制</label><label><input type="checkbox" name="variable_hours" ${c.variable_hours?'checked':''}>1箇月単位の変形労働時間制</label></div>
     </div>
+    <div class="grid g2" style="margin-top:10px">
+      <div class="f"><span>勤務する曜日（シフト制で曜日が決まっていなければ空欄）</span><div class="checks">${['月','火','水','木','金','土','日'].map(d=>`<label><input type="checkbox" name="wd" value="${d}" ${(c.work_weekdays||[]).includes(d)?'checked':''}>${d}</label>`).join('')}</div></div>
+      <label class="f"><span>休日（空欄なら「勤務日以外の日」と印字）</span><input type="text" name="holiday_text" value="${esc(c.holiday_text||'')}" placeholder="例：上記の勤務日以外の日（年末年始は会社の定めによる）"></label>
+    </div>
     <h3>保険・更新・昇給等</h3>
     <div class="grid g4">
       <div class="checks"><label><input type="checkbox" name="workers_comp" ${c.workers_comp?'checked':''}>労災保険</label><label><input type="checkbox" name="employment_insurance" ${c.employment_insurance?'checked':''}>雇用保険</label><label><input type="checkbox" name="social_insurance" ${c.social_insurance?'checked':''}>社会保険</label></div>
@@ -631,12 +635,15 @@ function openContractForm(c){
   ['wage_type','base_wage','hours_per_day','days_per_week','weekly_hours'].forEach(n=>F(n).addEventListener('input',check));
   F('wage_type').addEventListener('change',check);
   const autoWeekly=()=>{ const d=Number(F('days_per_week').value), h=Number(F('hours_per_day').value); if(d&&h) F('weekly_hours').value=Math.round(d*h*100)/100; check(); };
+  // 曜日を選んだら、週の勤務日数を選んだ数に合わせる
+  $$('[name=wd]',m).forEach(cb=>cb.addEventListener('change',()=>{ const n=$$('[name=wd]:checked',m).length; if(n){ F('days_per_week').value=n; autoWeekly(); } }));
   F('days_per_week').addEventListener('change',autoWeekly); F('hours_per_day').addEventListener('change',autoWeekly);
   check();
 
   const collect=()=>{
     const o={...c};
-    ['change_type','employment_type','status','start_date','end_date','signed_date','wage_type','work_location_other','job_detail','renewal','renewal_cap','raise_text','bonus_text','retirement_allowance_text','reason','note'].forEach(n=>o[n]=F(n).value||null);
+    ['change_type','employment_type','status','start_date','end_date','signed_date','wage_type','work_location_other','job_detail','renewal','renewal_cap','raise_text','bonus_text','retirement_allowance_text','holiday_text','reason','note'].forEach(n=>o[n]=F(n).value||null);
+    o.work_weekdays=$$('[name=wd]:checked',m).map(x=>x.value);
     o.is_fixed_term=F('is_fixed_term').value==='1';
     if(!o.is_fixed_term) o.end_date=null;
     o.base_wage=F('base_wage').value===''?null:Number(F('base_wage').value);
