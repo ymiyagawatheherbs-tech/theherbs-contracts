@@ -276,6 +276,13 @@ const STYLE = `
 .doc .preamble .pre-to{margin-bottom:5mm;font-size:11pt}
 .doc .preamble .pre-h{font-weight:600;margin:4mm 0 1mm;border-left:3px solid #5b7f5f;padding-left:2mm}
 .doc .preamble .pre-from{text-align:right;margin-top:8mm}
+@media screen and (min-width:761px){
+  .doc:not(.fixed){font-size:10.5pt;line-height:1.6}
+  .doc:not(.fixed) .doc-page{width:auto;max-width:200mm;padding:10mm 12mm;margin:0 auto 16px;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+  .doc:not(.fixed) .tiny,.doc:not(.fixed) ol.svc{font-size:9.8pt;line-height:1.55}
+  .doc:not(.fixed) h1{font-size:16pt}
+  .doc:not(.fixed) .preamble{font-size:11.5pt}
+}
 @media screen and (max-width:760px){
   .doc:not(.fixed){font-size:14px;line-height:1.7}
   .doc:not(.fixed) .doc-page{width:auto;padding:16px;margin:0 0 12px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.12)}
@@ -303,7 +310,7 @@ function injectStyles(){ if(document.getElementById('contract-render-style')) re
 // 印刷用：1ページ分が A4 の印刷範囲に収まらないときは、そのページだけ縮小して1枚に収める
 // （ブラウザやフォントの違いで数行あふれるのを防ぐ。maxMm は余白を除いた高さの目安）
 function fitPages(root, maxMm){
-  const max=(maxMm||265)*96/25.4;
+  const max=(maxMm||248)*96/25.4;
   const prev=root.getAttribute('style')||'';
   root.style.cssText='display:block;position:absolute;left:-10000px;top:0;visibility:hidden';
   root.querySelectorAll('.doc-page').forEach(pg=>{
