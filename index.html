@@ -266,9 +266,10 @@ function wageText(c){ if(!c) return ''; return `${c.wage_type} ${yen(c.base_wage
 
 // ===== データ読み込み =====
 async function loadAll(){
-  const [emp, ws, loc, con, rev, bon, set, req] = await Promise.all([
+  const [emp, ws, memo, loc, con, rev, bon, set, req] = await Promise.all([
     sb.from('employees').select('id,code,name,hire_date,active,role,title,location_id,schedule,week_days,sort_order,email,work_days,use_shift,manager_id').order('code'),
     sb.from('work_settings').select('employee_id,daily_hours,sched_in,sched_out,break_hours'),
+    sb.from('hr_employee_memos').select('employee_id,memo'),
     sb.from('locations').select('id,name'),
     sb.from('contracts').select('*'),
     sb.from('wage_reviews').select('*'),
@@ -276,7 +277,8 @@ async function loadAll(){
     sb.from('hr_settings').select('*'),
     sb.from('contract_sign_requests').select('*').order('created_at',{ascending:false})
   ]);
-  for(const r of [emp,ws,loc,con,rev,bon,set,req]) if(r.error) throw r.error;
+  for(const r of [emp,ws,memo,loc,con,rev,bon,set,req]) if(r.error) throw r.error;
+  S.memos={}; memo.data.forEach(x=>S.memos[x.employee_id]=x.memo);
   S.requests=req.data;
   S.employees=emp.data; S.contracts=con.data; S.reviews=rev.data; S.bonuses=bon.data;
   S.ws={}; ws.data.forEach(w=>S.ws[w.employee_id]=w);
@@ -427,6 +429,10 @@ function openEmployee(empId){
         </dl>
       </div>
     </div>
+    <div style="margin-top:10px">
+      <label class="f"><span>社内メモ（この人について・契約書には印字されません）</span>
+      <div class="row" style="gap:6px;align-items:flex-start"><textarea id="eMemo" style="flex:1;min-height:44px" placeholder="例：年収130万円まで勤務OK">${esc(S.memos[e.id]||'')}</textarea><button class="btn sm" id="eMemoSave">保存</button></div></label>
+    </div>
     <div class="row" style="margin:14px 0 6px">
       <h3 style="margin:0;flex:1">契約履歴</h3>
       <button class="btn pri" id="eRenew">${cur?'更新契約を作成':'契約を新規作成'}</button>
@@ -458,6 +464,12 @@ function openEmployee(empId){
     <div class="foot"><button class="btn" id="eClose">閉じる</button></div>
   `,{wide:true});
   $('#eClose',m).onclick=closeModal;
+  $('#eMemoSave',m).onclick=async()=>{
+    const v=$('#eMemo',m).value.trim()||null;
+    const r=await sb.from('hr_employee_memos').upsert({employee_id:e.id, memo:v, updated_at:new Date().toISOString()});
+    if(r.error){ toast('保存できませんでした：'+r.error.message); return; }
+    S.memos[e.id]=v; toast('メモを保存しました');
+  };
   $('#eRenew',m).onclick=()=>openContractForm(cur? renewFrom(cur) : newContractFor(e));
   $('#eImport',m).onclick=()=>openImport(empId);
   $('#eReview',m).onclick=()=>{ closeModal(); reviewState.empId=empId; reviewState.editing=null; showTab('review'); };
