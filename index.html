@@ -506,9 +506,19 @@ function weekdaysFromAttendance(e){
   const ds=[...new Set((e?.work_days||[]).map(n=>map[n]).filter(Boolean))];
   return order.filter(d=>ds.includes(d));
 }
+// 有期契約の終了日の初期値：会社の更新時期（毎年10/11〜翌10/10）にそろえ、次の10月10日とする。
+// 残りが3か月未満なら、その翌年の10月10日（契約期間は原則1年以内・初回のみ1年を少し超えることがある）
+function defaultEndDate(start){
+  // 契約期間が切れたまま後から作る場合は、今日を基準に「次の10月10日」とする
+  const t=todayStr(); if(start<t) start=t;
+  const y=Number(start.slice(0,4));
+  let end=`${y}-10-10`; if(end<start) end=`${y+1}-10-10`;
+  if(end < addDays(addMonths(start,3),-1)) end=`${Number(end.slice(0,4))+1}-10-10`;
+  return end;
+}
 function newContractFor(e){
   const ws=S.ws[e.id]; const t=todayStr();
-  const start=t; const end=addDays(addMonths(start,12),-1);
+  const start=t; const end=defaultEndDate(start);
   const loc=S.locations[e.location_id];
   return { employee_id:e.id, seq:1, change_type:'新規', employment_type:'パートタイム', is_fixed_term:true,
     start_date:start, end_date:end, wage_type:'時給', base_wage:minWage()||'', allowances:[], work_locations: loc?[loc]:[], work_location_other:'',
@@ -527,7 +537,7 @@ function renewFrom(c){
   n.seq=maxSeq+1; n.change_type='条件変更なし更新'; n.status='下書き'; n.reason=''; n.note='';
   const base = c.end_date ? addDays(c.end_date,1) : todayStr();
   n.start_date = base;
-  n.end_date = c.is_fixed_term ? addDays(addMonths(n.start_date,12),-1) : null;
+  n.end_date = c.is_fixed_term ? defaultEndDate(n.start_date) : null;
   { const rb=raiseBonusFor(n.employment_type); n.raise_text=rb.raise; n.bonus_text=rb.bonus; }
   // 勤務曜日：勤怠システムに登録があれば、それを最新として使う
   { const emp=S.employees.find(x=>x.id===c.employee_id); const wd=weekdaysFromAttendance(emp); if(wd.length) n.work_weekdays=wd; }
@@ -1521,7 +1531,7 @@ function renderSettings(){
       <label class="f"><span>欠勤の目安（期間内・日）</span><input type="number" id="rrAbs" value="${esc(rr.attendance_guide?.absence_max??3)}"></label>
       <label class="f"><span>正社員の評価月（7月支給分から昇給）</span><input type="number" id="rrMonth" min="1" max="12" value="${esc(rr.annual_review_month??6)}"></label>
     </div>
-    <p class="small muted">正社員：毎年この月に評価し、7月支給分から昇給（昇給日に勤続1年以上・賃金規程第15条）。パート・アルバイト・契約社員：定期昇給はなく、契約更新の前に評価して賃金を見直す（非正規従業員規程第40条）。</p>
+    <p class="small muted">正社員：毎年この月に評価し、7月支給分から昇給（昇給日に勤続1年以上・賃金規程第15条）。パート・アルバイト・契約社員：定期昇給はなく、毎年9月に評価し、10月11日からの契約で賃金を見直す（非正規従業員規程第40条）。契約期間は10/11〜翌10/10にそろえる。</p>
     <h3>評価項目</h3>
     <div id="edItems"></div>
     <h3>昇給テーブル（時給）</h3>
@@ -1621,7 +1631,7 @@ function printPolicy(){
   </ol>
   <h2>3. 賃金の見直し</h2>
   <ol>
-    <li>見直しの時期：正社員は毎年${esc(rr.annual_review_month??6)}月に評価し、7月支給分から昇給する（昇給日に勤続1年以上の者・賃金規程第15条）。パートタイム・アルバイト・契約社員は定期昇給を行わず、契約更新の前に評価して賃金を見直す（非正規従業員規程第40条）。いずれも、毎年10月の最低賃金改定時に下回る者は発効日から改定する。</li>
+    <li>見直しの時期：正社員は毎年${esc(rr.annual_review_month??6)}月に評価し、7月支給分から昇給する（昇給日に勤続1年以上の者・賃金規程第15条）。パートタイム・アルバイト・契約社員は定期昇給を行わず、毎年9月に評価し、10月11日から始まる契約で賃金を見直す（非正規従業員規程第40条）。契約期間は毎年10月11日〜翌年10月10日にそろえる。いずれも、最低賃金の改定時に下回る者は発効日から改定する。</li>
     <li>最低賃金：${esc(mw.pref||'')} ${yen(mw.amount)}円（${fmtD(mw.effective)}発効）。改定時は全員の時給換算額を確認し、下回る者は発効日から改定する。</li>
     <li>評価：次の項目をそれぞれ5段階で評価し、平均点で昇給額の目安を決める。勤怠（遅刻・欠勤）は勤怠システムの記録を用いる。目安：期間内の遅刻${esc(rr.attendance_guide?.late_max??'-')}回以内、欠勤${esc(rr.attendance_guide?.absence_max??'-')}日以内。</li>
   </ol>
