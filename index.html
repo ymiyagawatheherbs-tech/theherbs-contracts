@@ -424,7 +424,8 @@ function openEmployee(empId){
       <div>
         <dl class="kv">
           <dt>勤怠の勤務設定</dt><dd>${ws? `${(ws.sched_in||'').slice(0,5)}〜${(ws.sched_out||'').slice(0,5)}　休憩${ws.break_hours??''}h　所定${ws.daily_hours??''}h`:'なし'}</dd>
-          <dt>勤務日数</dt><dd>${esc(e.week_days||e.schedule||'')}</dd>
+          <dt>勤務日数</dt><dd>${(()=>{ const att=e.week_days||e.schedule||''; const cd=cur&&cur.days_per_week? `週${Number(cur.days_per_week)}日`:''; const diff=att&&cd&&att.replace(/\s/g,'')!==cd;
+            return `契約：${esc(cd||'未記入')}　／　勤怠アプリの設定：${esc(att||'未設定')}${diff?'<br><span style="color:#b45309">契約と勤怠アプリの設定が違います。勤怠アプリの設定は有給休暇の付与日数に使われるので、契約に合わせて直してください</span>':''}`; })()}</dd>
           <dt>勤務場所</dt><dd>${esc(S.locations[e.location_id]||'')}</dd>
         </dl>
       </div>
