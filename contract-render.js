@@ -134,7 +134,7 @@ function buildSnapshot({contract, employee, company, text, mkYears, firstStart})
   return { version:1, contract:c, employee:{ name:employee.name, code:employee.code, manager_name:employee.manager_name||null },
     company:{ name:company.name, address:company.address, representative:company.representative, contact_dept:company.contact_dept,
       contact_name:company.contact_name, contact_tel:company.contact_tel, closing_day:company.closing_day, pay_day:company.pay_day,
-      locations:company.locations||[], departments:company.departments||[] },
+      locations:company.locations||[], departments:company.departments||[], seal_image:company.seal_image||null },
     text:t, mk:{ years:mk, inPeriod:mkInPeriod }, issued_at:new Date().toISOString() };
 }
 
@@ -179,7 +179,7 @@ function render(snap, opts={}){
     <h1>${title}</h1>
     <div class="head">
       <div class="to">${esc(e.name)}　殿</div>
-      <div class="co">所在地　${esc(co.address||'')}<br>名　称　${esc(co.name||'')}<br>氏　名　${esc(co.representative||'')}${(signed||opts.esign)?'':' ㊞'}</div>
+      <div class="co">所在地　${esc(co.address||'')}<br>名　称　${esc(co.name||'')}<br>氏　名　<span class="rep">${esc(co.representative||'')}${co.seal_image?`<img class="seal" src="${co.seal_image}" alt="角印">`:((signed||opts.esign)?'':' ㊞')}</span></div>
     </div>
     <table class="ct"><tbody>
       <tr><th>契約期間</th><td>${fixed? `☑ 定めあり　令和 ${ws.y}年 ${ws.m}月 ${ws.d}日　～　令和 ${we.y}年 ${we.m}月 ${we.d}日` : `☑ 定めなし　令和 ${ws.y}年 ${ws.m}月 ${ws.d}日 から`}</td></tr>
@@ -291,6 +291,8 @@ const STYLE = `
 .doc .preamble .pre-sub{text-align:center;font-size:11pt;margin:0 0 7mm;letter-spacing:.04em}
 .doc .shift-list{display:none}
 .doc .esign-note{color:#5b7f5f;font-weight:600;white-space:normal}
+.doc .co .rep{position:relative;display:inline-block}
+.doc .co img.seal{position:absolute;left:100%;top:50%;margin-left:-17mm;transform:translateY(-32%);width:18mm;height:18mm;opacity:.92;pointer-events:none}
 .doc .preamble .pre-to{margin-bottom:5mm;font-size:11pt}
 .doc .preamble .pre-h{font-weight:600;margin:4mm 0 1mm;border-left:3px solid #5b7f5f;padding-left:2mm}
 .doc .preamble .pre-from{text-align:right;margin-top:8mm}

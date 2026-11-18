@@ -10,7 +10,7 @@
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
-<script src="contract-render.js?v=20261118a"></script>
+<script src="contract-render.js?v=20261118b"></script>
 <style>
 :root{
   --bg:#f6f5f1; --panel:#fff; --ink:#22281f; --sub:#667060; --line:#dcded6; --line2:#eceee8;
@@ -429,7 +429,7 @@ function previewEsign(c){
     const agree=`<div style="margin:12px 0 0;padding:12px;background:#fff;border-radius:8px;font-size:13px;font-family:sans-serif"><b>同意と署名</b>（いちばん下）<br>${CR.AGREEMENTS.map(a=>`☐ ${esc(a.label)}`).join('<br>')}<br>氏名・住所の入力、指での署名</div>`;
     const data=JSON.stringify(snap).replace(/</g,'\\u003c');
     const doc=`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-      <style>body{margin:0;padding:12px;background:#e9e8e2}</style><script src="contract-render.js?v=20261118a"><\/script></head>
+      <style>body{margin:0;padding:12px;background:#e9e8e2}</style><script src="contract-render.js?v=20261118b"><\/script></head>
       <body><div id="d"></div>${agree}<script>ContractRender.injectStyles();document.getElementById('d').innerHTML=ContractRender.render(${data},{mobile:${sp},esign:true});<\/script></body></html>`;
     box.innerHTML=`<iframe style="width:${sp?'390px':'100%'};height:68vh;border:0;background:#e9e8e2;display:block;margin:0 auto"></iframe>`;
     $('iframe',box).srcdoc=doc;
@@ -1624,6 +1624,12 @@ function renderSettings(){
       <label class="f"><span>就業場所の選択肢（1行に1つ）</span><textarea id="coLocs">${esc((co.locations||[]).join('\n'))}</textarea></label>
       <label class="f"><span>部署の選択肢（1行に1つ）</span><textarea id="coDeps">${esc((co.departments||[]).join('\n'))}</textarea></label>
     </div>
+    <div class="row" style="margin-top:10px;gap:12px;align-items:center">
+      <div class="f" style="margin:0"><span>角印（契約書の会社欄に表示）</span>
+        <div class="row" style="gap:8px;align-items:center"><div id="coSealPv" style="width:64px;height:64px;border:1px dashed var(--line);display:flex;align-items:center;justify-content:center;background:#fff">${co.seal_image?`<img src="${co.seal_image}" style="width:60px;height:60px">`:'<span class="small muted">なし</span>'}</div>
+        <input type="file" id="coSealFile" accept="image/png,image/jpeg"><button class="btn sm" id="coSealDel">削除</button></div>
+        <span class="small muted">背景を抜いた正方形のPNG画像。選ぶと保存されます。すでに送った署名依頼の契約書には入りません。</span></div>
+    </div>
     <div class="row" style="margin-top:10px"><button class="btn pri" id="coSave">保存</button></div>
   </div>`;
   const items=tableEditor($('#edItems'), [{k:'label',l:'項目名',w:360}], JSON.parse(JSON.stringify(rr.items||[])));
@@ -1644,6 +1650,13 @@ function renderSettings(){
     const base={}; EMP_TYPES.forEach(t=>base[t]={kind:$(`[data-bk="${t}"]`).value, value:Number($(`[data-bv="${t}"]`).value)});
     saveSetting('bonus_rules',{...br, eligibility:$('#brElig').value, periods:periods.get(), base, eval_coef:evalC.get(), attendance_coef:attC.get()});
   };
+  $('#coSealFile').onchange=async ev=>{
+    const f=ev.target.files[0]; if(!f) return;
+    if(f.size>300*1024){ toast('画像が大きすぎます（300KBまで）'); return; }
+    const url=await new Promise(r=>{ const fr=new FileReader(); fr.onload=()=>r(fr.result); fr.readAsDataURL(f); });
+    await saveSetting('company',{...setting('company',{}), seal_image:url}); toast('角印を保存しました'); renderSettings();
+  };
+  $('#coSealDel').onclick=async()=>{ if(!confirm('角印の画像を削除しますか')) return; const c2={...setting('company',{})}; delete c2.seal_image; await saveSetting('company',c2); renderSettings(); };
   $('#coSave').onclick=()=>saveSetting('company',{...co, name:$('#coName').value, address:$('#coAddr').value, representative:$('#coRep').value, contact_dept:$('#coDept').value, contact_name:$('#coCName').value, contact_tel:$('#coTel').value, closing_day:Number($('#coClose').value), pay_day:Number($('#coPay').value), locations:$('#coLocs').value.split('\n').map(s=>s.trim()).filter(Boolean), departments:$('#coDeps').value.split('\n').map(s=>s.trim()).filter(Boolean)});
   $('#stPolicy').onclick=printPolicy;
   bindContractText();
