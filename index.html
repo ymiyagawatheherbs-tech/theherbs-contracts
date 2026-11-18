@@ -402,6 +402,36 @@ function openModal(html, {wide=false}={}){
 }
 function closeModal(){ $('#modalRoot').innerHTML=''; }
 
+// ===== 電子署名の見え方確認（本人が署名依頼のリンクを開いたときの画面） =====
+function previewEsign(c){
+  if(!c) return;
+  const e=S.employees.find(x=>x.id===c.employee_id);
+  const snap=snapshotFor(c);
+  const m=openModal(`
+    <div class="row" style="gap:8px;align-items:center;margin-bottom:8px">
+      <h2 style="margin:0;flex:1">電子署名の見え方：${esc(e?.name||'')}（${c.seq}回目）</h2>
+      <button class="btn sm" id="pvPc">パソコン</button><button class="btn sm" id="pvSp">スマホ</button>
+      <button class="btn sm" id="pvBack">戻る</button>
+    </div>
+    <p class="small muted" style="margin:0 0 8px">本人が署名依頼のリンクを開いたときに見える契約書です。各項目の押印欄は「最後にまとめて署名」の案内になり、いちばん下で一度だけ署名します。ここでは署名できません。</p>
+    <div id="pvBox" style="background:#e9e8e2;padding:8px;border-radius:10px;margin:0 auto"></div>`, {wide:true});
+  const show=sp=>{
+    const box=$('#pvBox',m);
+    box.style.maxWidth = sp? '430px' : '940px';
+    // 本人の画面と同じ見た目にするため、スマホ／パソコンの幅の枠（iframe）の中で表示する
+    const agree=`<div style="margin:12px 0 0;padding:12px;background:#fff;border-radius:8px;font-size:13px;font-family:sans-serif"><b>同意と署名</b>（いちばん下）<br>${CR.AGREEMENTS.map(a=>`☐ ${esc(a.label)}`).join('<br>')}<br>氏名・住所の入力、指での署名</div>`;
+    const data=JSON.stringify(snap).replace(/</g,'\\u003c');
+    const doc=`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+      <style>body{margin:0;padding:12px;background:#e9e8e2}</style><script src="contract-render.js?v=20261112i"><\/script></head>
+      <body><div id="d"></div>${agree}<script>ContractRender.injectStyles();document.getElementById('d').innerHTML=ContractRender.render(${data},{mobile:${sp},esign:true});<\/script></body></html>`;
+    box.innerHTML=`<iframe style="width:${sp?'390px':'100%'};height:68vh;border:0;background:#e9e8e2;display:block;margin:0 auto"></iframe>`;
+    $('iframe',box).srcdoc=doc;
+  };
+  $('#pvPc',m).onclick=()=>show(false); $('#pvSp',m).onclick=()=>show(true);
+  $('#pvBack',m).onclick=()=>openEmployee(c.employee_id);
+  show(false);
+}
+
 // ===== 従業員詳細 =====
 function openEmployee(empId){
   const e=S.employees.find(x=>x.id===empId); if(!e) return;
@@ -449,7 +479,7 @@ function openEmployee(empId){
         <td>${statusPill(c)}${c.signed_date?`<div class="small muted">締結 ${fmtD(c.signed_date)}</div>`:''}</td>
         <td>${c.file_path? `<button class="btn sm" data-view="${c.id}">表示</button> `:''}<label class="btn sm">${c.file_path?'差替':'保管'}<input type="file" accept="application/pdf,image/*" data-up="${c.id}" class="hidden"></label></td>
         <td class="small">${esc(c.reason||'')}${c.reason&&c.note?'<br>':''}<span class="muted">${esc(c.note||'')}</span></td>
-        <td style="white-space:nowrap"><button class="btn sm" data-edit="${c.id}">編集</button> <button class="btn sm" data-print="${c.id}">印刷</button> ${c.status!=='終了'?`<button class="btn sm pri" data-send="${c.id}">署名依頼</button>`:''}${reqBadge(c)}</td>
+        <td style="white-space:nowrap"><button class="btn sm" data-edit="${c.id}">編集</button> <button class="btn sm" data-print="${c.id}">印刷</button> ${c.status!=='終了'?`<button class="btn sm" data-preview="${c.id}">見え方確認</button> `:''}${c.status!=='終了'?`<button class="btn sm pri" data-send="${c.id}">署名依頼</button>`:''}${reqBadge(c)}</td>
       </tr>`).join('') || '<tr><td colspan="9" class="muted">契約がありません</td></tr>'}</tbody>
     </table></div>
     <h3>昇給検討の記録</h3>
@@ -476,6 +506,7 @@ function openEmployee(empId){
   $('#eReview',m).onclick=()=>{ closeModal(); reviewState.empId=empId; reviewState.editing=null; showTab('review'); };
   $$('[data-edit]',m).forEach(b=>b.onclick=()=>openContractForm({...S.contracts.find(c=>c.id==b.dataset.edit)}));
   $$('[data-print]',m).forEach(b=>b.onclick=()=>printContract(S.contracts.find(c=>c.id==b.dataset.print)));
+  $$('[data-preview]',m).forEach(b=>b.onclick=()=>previewEsign(S.contracts.find(c=>c.id==b.dataset.preview)));
   $$('[data-send]',m).forEach(b=>b.onclick=()=>openSendRequest(S.contracts.find(c=>c.id==b.dataset.send)));
   $$('[data-view]',m).forEach(b=>b.onclick=()=>viewFile(S.contracts.find(c=>c.id==b.dataset.view)));
   $$('[data-up]',m).forEach(inp=>inp.onchange=()=>uploadFile(S.contracts.find(c=>c.id==inp.dataset.up), inp.files[0]));
