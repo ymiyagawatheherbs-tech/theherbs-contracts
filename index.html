@@ -316,7 +316,9 @@ function renderDash(){
   const ambers=all.flatMap(x=>x.a.filter(a=>a.lv==='amber').map(a=>({...a,e:x.e})));
   const blues=all.flatMap(x=>x.a.filter(a=>a.lv==='blue').map(a=>({...a,e:x.e})));
   const mw=setting('min_wage',{});
-  const line=a=>`<div class="alert ${a.lv}"><div class="who"><a href="#" data-emp="${a.e.id}">${esc(a.e.name)}</a></div><div class="msg">${esc(a.msg)}</div></div>`;
+  // 同じ人の注意が複数あるときは、1人1行にまとめて表示する
+  const lines=list=>{ const g=[]; list.forEach(a=>{ let x=g.find(y=>y.e.id===a.e.id); if(!x){ x={e:a.e, lv:a.lv, msgs:[]}; g.push(x); } x.msgs.push(a.msg); });
+    return g.map(x=>`<div class="alert ${x.lv}"><div class="who"><a href="#" data-emp="${x.e.id}">${esc(x.e.name)}</a></div><div class="msg">${x.msgs.length>1? x.msgs.map(m=>`・${esc(m)}`).join('<br>') : esc(x.msgs[0])}</div></div>`).join(''); };
   $('#tab-dash').innerHTML=`
   <div class="kpis">
     <div class="kpi"><div class="v">${staff.length}</div><div class="l">在籍者（管理者除く）</div></div>
@@ -329,15 +331,15 @@ function renderDash(){
   ${signTodoCard()}
   <div class="card">
     <h2>すぐに対応が必要</h2>
-    ${reds.length? reds.map(line).join('') : '<p class="muted">ありません。</p>'}
+    ${reds.length? lines(reds) : '<p class="muted">ありません。</p>'}
   </div>
   <div class="card">
     <h2>準備・確認が必要</h2>
-    ${ambers.length? ambers.map(line).join('') : '<p class="muted">ありません。</p>'}
+    ${ambers.length? lines(ambers) : '<p class="muted">ありません。</p>'}
   </div>
   <div class="card">
     <h2>管理の抜け</h2>
-    ${blues.length? blues.map(line).join('') : '<p class="muted">ありません。</p>'}
+    ${blues.length? lines(blues) : '<p class="muted">ありません。</p>'}
   </div>
   <div class="card small muted">
     最低賃金：${esc(mw.pref||'')} ${yen(mw.amount)}円（${fmtD(mw.effective)}発効）。毎年10月の改定後に「基準・設定」で更新してください。
