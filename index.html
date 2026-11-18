@@ -255,6 +255,11 @@ function alertsFor(emp){
   const lr=lastReview(emp.id);
   if(!lr) out.push({lv:'blue',code:'noreview',msg:'昇給検討の記録がまだありません'});
   else if(daysBetween(lr.review_date,t)>365) out.push({lv:'blue',code:'oldreview',msg:`前回の昇給検討から1年以上経過（${fmtD(lr.review_date)}）`});
+  // 昇給検討で決めた賃金が、契約（下書きを含む）に反映されているか
+  if(lr && lr.decision==='昇給' && lr.decided_wage && lr.effective_date){
+    const reflected=contractsOf(emp.id).some(x=>Number(x.base_wage)===Number(lr.decided_wage) && x.start_date>=lr.effective_date);
+    if(!reflected) out.push({lv:'amber',code:'review_unapplied',msg:`昇給検討で決めた賃金（${yen(lr.decided_wage)}円・${fmtD(lr.effective_date)}から）の契約がまだありません。「更新契約を作成」で契約を作ってください`});
+  }
   return out;
 }
 function statusPill(c){
@@ -370,7 +375,7 @@ function renderStaff(){
       <tbody>${rows.map(({e,c,a,fs})=>{
         const left=c&&c.end_date? daysBetween(t,c.end_date):null;
         const leftTxt= c? (c.end_date? (left<0? `<span class="pill p-red">${-left}日超過</span>` : (left<=60? `<span class="pill p-amber">${left}日</span>`:`${left}日`)) : '<span class="muted">期間の定めなし</span>') : '';
-        const flags=a.filter(x=>x.lv!=='blue').map(x=>`<span class="pill ${x.lv==='red'?'p-red':'p-amber'}" title="${esc(x.msg)}">${({none:'未登録',expired:'期限切れ',soon:'満了間近',check:'要確認',muki:'無期転換',minwage:'最賃未満'})[x.code]}</span>`).join(' ');
+        const flags=a.filter(x=>x.lv!=='blue').map(x=>`<span class="pill ${x.lv==='red'?'p-red':'p-amber'}" title="${esc(x.msg)}">${({none:'未登録',expired:'期限切れ',soon:'満了間近',check:'要確認',muki:'無期転換',minwage:'最賃未満',review_unapplied:'昇給未反映'})[x.code]}</span>`).join(' ');
         return `<tr class="click" data-emp="${e.id}">
           <td>${e.code}</td><td><b>${esc(e.name)}</b>${e.active?'':' <span class="pill p-gray">退職</span>'}<div class="small muted">${esc(e.title||'')}</div></td>
           <td>${esc(c?.employment_type||'')}</td>
